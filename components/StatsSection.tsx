@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Briefcase, XCircle, CheckCircle2, TrendingUp } from 'lucide-react';
 import { CareerStats } from '../types';
@@ -9,7 +8,7 @@ interface StatsSectionProps {
 
 const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       <StatCard 
         label="Total Applied" 
         value={stats.totalApplied.toString()} 
@@ -29,7 +28,7 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
         color="emerald" 
       />
       <StatCard 
-        label="Success Rate" 
+        label="Hit / Success Rate" 
         value={`${stats.successRate}%`} 
         icon={<TrendingUp className="w-5 h-5" />} 
         color="amber" 
@@ -54,13 +53,13 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon, color }) => {
   };
 
   return (
-    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col gap-2 shadow-sm transition-transform hover:-translate-y-1">
+    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 flex flex-col gap-2 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors[color]}`}>
         {icon}
       </div>
       <div>
-        <div className="text-2xl sm:text-3xl font-bold text-slate-900">{value}</div>
-        <div className="text-xs sm:text-sm font-medium text-slate-500">{label}</div>
+        <div className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">{value}</div>
+        <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</div>
       </div>
     </div>
   );

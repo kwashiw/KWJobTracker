@@ -232,17 +232,17 @@ const App: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="flex flex-col sm:space-y-3 mb-4">
-                    <div className="flex items-center justify-between sm:justify-start gap-4 text-[10px] sm:text-sm text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
-                        <span className="font-bold text-slate-700 truncate max-w-[120px] sm:max-w-none">
+                  <div className="flex flex-col mb-4">
+                    <div className="flex items-center justify-between gap-3 text-slate-500">
+                      <div className="flex items-center gap-1 flex-1 min-w-0">
+                        <TrendingUp className="w-3 h-3 text-indigo-400 shrink-0" />
+                        <span className="font-bold text-slate-700 truncate text-[9px] sm:text-[11px] leading-tight">
                           {job.salaryRange}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 opacity-60">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-medium">{new Date(job.dateAdded).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-1 opacity-60 shrink-0">
+                        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="font-medium text-[9px] sm:text-[11px] whitespace-nowrap">{new Date(job.dateAdded).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>

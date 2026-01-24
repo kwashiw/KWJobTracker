@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, 
   Briefcase, 
@@ -19,8 +18,6 @@ import SettingsModal from './components/SettingsModal';
 
 const App: React.FC = () => {
   const [jobs, setJobs] = useState<JobApplication[]>([]);
-  const [historicalRejections, setHistoricalRejections] = useState<number>(0);
-  const [historicalOffers, setHistoricalOffers] = useState<number>(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -32,33 +29,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const savedJobs = localStorage.getItem('kw_track_jobs');
-    const savedHistRej = localStorage.getItem('kw_track_historical_rejections');
-    const savedHistOff = localStorage.getItem('kw_track_historical_offers');
-    
-    if (savedJobs) setJobs(JSON.parse(savedJobs));
-    if (savedHistRej) setHistoricalRejections(parseInt(savedHistRej, 10));
-    if (savedHistOff) setHistoricalOffers(parseInt(savedHistOff, 10));
+    if (savedJobs) {
+      try {
+        setJobs(JSON.parse(savedJobs));
+      } catch (e) {
+        console.error("Failed to parse local jobs", e);
+      }
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('kw_track_jobs', JSON.stringify(jobs));
-    localStorage.setItem('kw_track_historical_rejections', historicalRejections.toString());
-    localStorage.setItem('kw_track_historical_offers', historicalOffers.toString());
-  }, [jobs, historicalRejections, historicalOffers]);
+  }, [jobs]);
 
   const stats: CareerStats = useMemo(() => {
-    const currentOffersCount = jobs.filter(j => j.status === JobStatus.OFFER).length;
-    const totalOffers = historicalOffers + currentOffersCount;
-    const totalApplied = jobs.length + historicalRejections + historicalOffers;
+    const totalOffers = jobs.filter(j => j.status === JobStatus.OFFER).length;
+    const totalRejections = jobs.filter(j => j.status === JobStatus.REJECTED).length;
+    const totalApplied = jobs.length;
+    
     const successRate = totalApplied > 0 ? (totalOffers / totalApplied) * 100 : 0;
 
     return {
       totalApplied,
-      totalRejections: historicalRejections,
+      totalRejections,
       totalOffers,
       successRate: Math.round(successRate)
     };
-  }, [jobs, historicalRejections, historicalOffers]);
+  }, [jobs]);
 
   const handleAddJob = async (title: string, description: string, url: string) => {
     const id = crypto.randomUUID();
@@ -95,37 +92,49 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteJob = (id: string) => {
-    setHistoricalRejections(prev => prev + 1);
-    setJobs(prev => prev.filter(j => j.id !== id));
+  const handleDeleteJob = useCallback((id: string) => {
+    // Close modal immediately
     setSelectedJobId(null);
-  };
-
-  const updateJobStatus = (id: string, newStatus: JobStatus) => {
-    if (newStatus === JobStatus.REJECTED) {
-      setHistoricalRejections(prev => prev + 1);
+    
+    // Delete job after a brief delay to let modal unmount cleanly
+    setTimeout(() => {
       setJobs(prev => prev.filter(j => j.id !== id));
-      setSelectedJobId(null);
-    } else {
-      setJobs(prev => prev.map(j => j.id === id ? { 
-        ...j, 
-        status: newStatus, 
-        dateModified: new Date().toISOString() 
-      } : j));
-    }
-  };
+    }, 0);
+  }, []);
 
-  const handleImport = (data: { jobs: JobApplication[], historicalRejections: number, historicalOffers?: number }) => {
+  const handleResetData = useCallback(() => {
+    setJobs([]);
+    localStorage.removeItem('kw_track_jobs');
+    setIsSettingsOpen(false);
+  }, []);
+
+  const updateJobStatus = useCallback((id: string, newStatus: JobStatus) => {
+    // If a job is marked as rejected, we close the modal since it will disappear from the tracker list
+    if (newStatus === JobStatus.REJECTED) {
+      setSelectedJobId(null);
+    }
+    
+    setJobs(prev => prev.map(j => j.id === id ? { 
+      ...j, 
+      status: newStatus, 
+      dateModified: new Date().toISOString() 
+    } : j));
+  }, []);
+
+  const handleImport = (data: { jobs: JobApplication[] }) => {
     setJobs(data.jobs);
-    setHistoricalRejections(data.historicalRejections);
-    setHistoricalOffers(data.historicalOffers || 0);
     setIsSettingsOpen(false);
   };
 
-  const filteredJobs = jobs.filter(j => 
-    j.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    j.company.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter out Rejected roles so they don't appear in the main tracker list, but stay in the master 'jobs' for stats
+  const filteredJobs = useMemo(() => 
+    jobs.filter(j => 
+      j.status !== JobStatus.REJECTED && (
+        j.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        j.company.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    )
+  , [jobs, searchQuery]);
 
   return (
     <div className="min-h-screen pb-24 md:pb-10 bg-slate-50/50 text-slate-900">
@@ -143,7 +152,7 @@ const App: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Search tracker..."
+                placeholder="Search active roles..."
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-transparent rounded-full text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-300 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -176,27 +185,24 @@ const App: React.FC = () => {
         <div className="mt-8 sm:mt-12">
           <div className="flex items-center justify-between mb-3 sm:mb-6">
             <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight px-1">Active Tracker</h2>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{jobs.length} Items</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{filteredJobs.length} Active Items</span>
           </div>
 
-          {/* List/Grid Container */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
             {filteredJobs.length > 0 ? (
               filteredJobs.map(job => (
                 <div 
                   key={job.id} 
-                  className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 p-3 sm:p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer group flex flex-col sm:h-full active:scale-[0.99] relative overflow-hidden"
+                  className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 p-4 sm:p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer group flex flex-col sm:h-full active:scale-[0.99] relative overflow-hidden"
                   onClick={() => setSelectedJobId(job.id)}
                 >
-                  {/* Status Strip for Mobile - minimal visual indicator */}
                   <div className={`sm:hidden absolute left-0 top-0 bottom-0 w-1 ${
                     job.status === JobStatus.OFFER ? 'bg-emerald-500' :
                     job.status === JobStatus.INTERVIEWING ? 'bg-amber-500' :
                     'bg-slate-300'
                   }`} />
 
-                  {/* Top Row: Title & Status */}
-                  <div className="flex justify-between items-start mb-1 sm:mb-4">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4">
                     <div className="flex-1 min-w-0 pr-2">
                       <div className="flex items-center gap-1.5">
                         <h3 className="font-bold text-slate-900 text-sm sm:text-lg group-hover:text-indigo-600 transition-colors truncate">
@@ -210,15 +216,14 @@ const App: React.FC = () => {
                             className="p-1 hover:bg-slate-100 rounded-md text-slate-300 hover:text-indigo-500 transition-colors shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         )}
                       </div>
-                      <p className="text-slate-500 text-[11px] sm:text-sm font-semibold truncate">{job.company}</p>
+                      <p className="text-slate-500 text-[11px] sm:text-sm font-semibold truncate uppercase tracking-wider">{job.company}</p>
                     </div>
                     
-                    {/* Status Badge */}
-                    <span className={`text-[8px] sm:text-[10px] uppercase font-black tracking-widest px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded sm:rounded-lg shrink-0 ${
+                    <span className={`text-[8px] sm:text-[10px] uppercase font-black tracking-widest px-2 py-0.5 sm:py-1 rounded sm:rounded-lg shrink-0 ${
                       job.status === JobStatus.OFFER ? 'bg-emerald-100 text-emerald-700 sm:border sm:border-emerald-200' :
                       job.status === JobStatus.INTERVIEWING ? 'bg-amber-100 text-amber-700' :
                       'bg-slate-100 text-slate-600'
@@ -227,49 +232,35 @@ const App: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Info Row: Salary & Dates */}
-                  <div className="flex flex-col sm:space-y-3 mb-1 sm:mb-6">
-                    <div className="flex items-center justify-between sm:justify-start gap-2 text-[10px] sm:text-sm text-slate-500">
+                  <div className="flex flex-col sm:space-y-3 mb-4">
+                    <div className="flex items-center justify-between sm:justify-start gap-4 text-[10px] sm:text-sm text-slate-500">
                       <div className="flex items-center gap-1.5">
-                        <TrendingUp className="w-3 sm:w-4 h-3 sm:h-4 text-slate-400" />
-                        <span className="font-bold text-slate-700 sm:bg-slate-50 sm:px-2 sm:py-0.5 sm:rounded sm:border sm:border-slate-100 truncate">
+                        <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="font-bold text-slate-700 truncate max-w-[120px] sm:max-w-none">
                           {job.salaryRange}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 sm:hidden opacity-60">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(job.dateAdded).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-1.5 opacity-60">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="font-medium">{new Date(job.dateAdded).toLocaleDateString()}</span>
                       </div>
-                    </div>
-                    
-                    {/* Desktop Only Date Display */}
-                    <div className="hidden sm:flex items-center gap-2.5 text-sm text-slate-600">
-                      <Calendar className="w-4 h-4 text-slate-400" />
-                      <span className="font-medium">Added {new Date(job.dateAdded).toLocaleDateString()}</span>
                     </div>
                   </div>
 
-                  {/* Footer - Modified Date & Icon (Desktop Only Chevron style) */}
-                  <div className="hidden sm:flex mt-auto pt-5 border-t border-slate-50 items-center justify-between">
+                  <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                     <div className="text-[9px] text-slate-400 uppercase tracking-widest font-black">
                       MODIFIED {new Date(job.dateModified).toLocaleDateString()}
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
                       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400" />
                     </div>
-                  </div>
-                  
-                  {/* Mobile Modified Date Indicator */}
-                  <div className="sm:hidden mt-1 pt-1.5 border-t border-slate-50 flex justify-between items-center text-[8px] font-black text-slate-300 uppercase tracking-tighter">
-                    <span>Last touch: {new Date(job.dateModified).toLocaleDateString()}</span>
-                    <ChevronRight className="w-2.5 h-2.5" />
                   </div>
                 </div>
               ))
             ) : (
               <div className="col-span-full py-16 sm:py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
                 <div className="bg-slate-50 w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 sm:mb-6 rotate-3">
-                  <Briefcase className="w-8 h-8 sm:w-10 sm:h-10 text-slate-300" />
+                  <Briefcase className="w-8 h-8 sm:w-10 h-10 text-slate-300" />
                 </div>
                 <h3 className="text-slate-900 font-black text-xl sm:text-2xl tracking-tight">Tracker is empty</h3>
                 <p className="text-slate-500 max-w-xs mx-auto mt-2 font-medium px-4 text-sm sm:text-base">Add a new job description to start tracking your journey.</p>
@@ -286,12 +277,18 @@ const App: React.FC = () => {
       </main>
 
       <AddJobModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddJob} />
-      <JobDetailModal job={selectedJob} onClose={() => setSelectedJobId(null)} onDelete={handleDeleteJob} onUpdateStatus={updateJobStatus} />
+      <JobDetailModal 
+        job={selectedJob} 
+        onClose={() => setSelectedJobId(null)} 
+        onDelete={handleDeleteJob} 
+        onUpdateStatus={updateJobStatus} 
+      />
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
-        currentData={{ jobs, historicalRejections, historicalOffers }}
+        currentData={{ jobs }}
         onImport={handleImport}
+        onReset={handleResetData}
       />
 
       <button 

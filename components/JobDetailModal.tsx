@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { X, Trash2, ExternalLink, Calendar, Briefcase, TrendingUp, Clock } from 'lucide-react';
 import { JobApplication, JobStatus } from '../types';
@@ -13,9 +12,28 @@ interface JobDetailModalProps {
 const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete, onUpdateStatus }) => {
   if (!job) return null;
 
+  const handleConfirmDelete = (e: React.MouseEvent) => {
+    // Prevent any bubbling or default actions that might interfere with state updates
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const confirmed = window.confirm("Are you sure? This will remove the role from your tracker and all statistics.");
+    
+    if (confirmed) {
+      // The parent App.tsx handler is optimized to close this window first and then filter state
+      onDelete(job.id);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-slate-100 flex items-start justify-between">
           <div className="flex-1 mr-4 min-w-0">
@@ -46,36 +64,34 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
         </div>
 
         {/* Content */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6 sm:space-y-8">
-          {/* Metadata Cards */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 sm:mb-2 flex items-center gap-1.5">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <TrendingUp className="w-3 h-3" /> Salary Range
               </div>
-              <div className="text-slate-900 font-semibold text-sm sm:text-base">{job.salaryRange}</div>
+              <div className="text-slate-900 font-semibold">{job.salaryRange}</div>
             </div>
-            <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 sm:mb-2 flex items-center gap-1.5">
-                <Calendar className="w-3 h-3" /> Date Applied
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Calendar className="w-3 h-3" /> Date Added
               </div>
-              <div className="text-slate-900 font-semibold text-sm sm:text-base">
+              <div className="text-slate-900 font-semibold">
                 {new Date(job.dateAdded).toLocaleDateString(undefined, { dateStyle: 'medium' })}
               </div>
             </div>
           </div>
 
-          {/* Status Selection */}
-          <div className="space-y-2 sm:space-y-3">
+          <div className="space-y-3">
             <label className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-2">
               <Clock className="w-3.5 h-3.5" /> Application Status
             </label>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex flex-wrap gap-2">
               {Object.values(JobStatus).map((status) => (
                 <button
                   key={status}
                   onClick={() => onUpdateStatus(job.id, status)}
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all border-2 ${
+                  className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all border-2 ${
                     job.status === status
                       ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                       : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-200'
@@ -87,31 +103,27 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
             </div>
           </div>
 
-          {/* Description */}
-          <div className="space-y-2 sm:space-y-3">
+          <div className="space-y-3">
             <label className="text-xs sm:text-sm font-bold text-slate-700">Job Description</label>
-            <div className="bg-slate-50 rounded-xl p-3 sm:p-4 text-slate-600 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap border border-slate-100">
+            <div className="bg-slate-50 rounded-xl p-4 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap border border-slate-100">
               {job.description}
             </div>
           </div>
         </div>
 
-        {/* Footer - Optimized for Mobile */}
-        <div className="p-3 sm:p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 overflow-hidden">
+        {/* Footer */}
+        <div className="p-5 sm:p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-4">
           <button 
-            onClick={() => {
-              if (window.confirm("Delete this role? This will mark it as a 'Rejection' for your success rate statistics.")) {
-                onDelete(job.id);
-              }
-            }}
-            className="flex items-center gap-1.5 text-rose-600 font-bold hover:bg-rose-100 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors text-[10px] sm:text-sm whitespace-nowrap shrink-0"
+            type="button"
+            onClick={handleConfirmDelete}
+            className="flex items-center gap-2 text-rose-600 font-bold hover:bg-rose-100 px-4 py-2 rounded-lg transition-all text-sm group"
           >
-            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
             Delete Role
           </button>
           
-          <div className="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-tight text-right truncate">
-            Modified: {new Date(job.dateModified).toLocaleDateString()} {new Date(job.dateModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight text-right">
+            Modified: {new Date(job.dateModified).toLocaleDateString()}
           </div>
         </div>
       </div>

@@ -38,9 +38,22 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('kw_track_jobs', JSON.stringify(jobs));
-    localStorage.setItem('kw_resume_data', JSON.stringify(resumeData));
-  }, [jobs, resumeData]);
+    try {
+      localStorage.setItem('kw_track_jobs', JSON.stringify(jobs));
+    } catch (e) {
+      console.error("Failed to save jobs to localStorage", e);
+    }
+  }, [jobs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kw_resume_data', JSON.stringify(resumeData));
+    } catch (e: any) {
+      if (e.name === 'QuotaExceededError') {
+        alert("Warning: Resume file is too large for local storage. Try a smaller PDF or copy-paste text.");
+      }
+    }
+  }, [resumeData]);
 
   const stats: CareerStats = useMemo(() => {
     const totalOffers = jobs.filter(j => j.status === JobStatus.OFFER).length;
@@ -110,37 +123,39 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
-            {pendingActions.length > 0 && (
-              <div className="relative">
-                <button 
-                  onClick={() => setShowPending(!showPending)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all ${showPending ? 'bg-amber-100 text-amber-700' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
-                >
-                  <Bell className={`w-3 h-3 ${!showPending && 'animate-bounce'}`} />
-                  <span className="hidden xs:inline">{pendingActions.length} Pending</span>
-                </button>
-                
-                {showPending && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 z-[60]">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-[10px] font-black uppercase text-slate-400">Outreach Tasks</h4>
-                      <button onClick={() => setShowPending(false)}><X className="w-4 h-4 text-slate-300" /></button>
-                    </div>
-                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                      {pendingActions.map(action => (
-                        <div key={action.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors" onClick={() => { setSelectedJobId(action.jobId); setShowPending(false); }}>
-                          <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{action.company}</p>
-                          <p className="text-xs font-bold text-slate-700 leading-tight mb-2">{action.stage} Follow-up</p>
-                          <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold uppercase">
-                            <Calendar className="w-3 h-3" /> Due Soon
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            <div className="relative">
+              <button 
+                onClick={() => pendingActions.length > 0 && setShowPending(!showPending)}
+                className={`p-2 rounded-full transition-all relative ${pendingActions.length > 0 ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300'}`}
+              >
+                <Bell className={`w-6 h-6 ${pendingActions.length > 0 && !showPending && 'animate-bounce'}`} />
+                {pendingActions.length > 0 && (
+                  <span className="absolute top-1 right-1 bg-rose-600 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                    {pendingActions.length}
+                  </span>
                 )}
-              </div>
-            )}
+              </button>
+              
+              {showPending && pendingActions.length > 0 && (
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 z-[60]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400">Outreach Tasks</h4>
+                    <button onClick={() => setShowPending(false)}><X className="w-4 h-4 text-slate-300" /></button>
+                  </div>
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {pendingActions.map(action => (
+                      <div key={action.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors" onClick={() => { setSelectedJobId(action.jobId); setShowPending(false); }}>
+                        <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{action.company}</p>
+                        <p className="text-xs font-bold text-slate-700 leading-tight mb-2">{action.stage} Follow-up</p>
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold uppercase">
+                          <Calendar className="w-3 h-3" /> Due Soon
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
               <Settings className="w-5 h-5" />
@@ -149,7 +164,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 mb-24 lg:mb-12">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 mb-24 lg:mb-16 relative">
         {activeTab === 'tracker' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <StatsSection stats={stats} />
@@ -228,14 +243,14 @@ const App: React.FC = () => {
         {activeTab === 'interviews' && <InterviewAgenda interviews={upcomingInterviews} onSelectJob={setSelectedJobId} />}
         {activeTab === 'resume' && <ResumeLab resumeData={resumeData} jobs={jobs} onSaveResume={setResumeData} onUpdateJob={updateJob} />}
         
-        {/* Footnote inside scroll content for mobile */}
-        <div className="lg:hidden text-center mt-12 pb-4 text-[9px] font-black text-slate-300 uppercase tracking-widest opacity-60">
+        {/* Footnote inside scroll content for mobile - strictly non-fixed */}
+        <div className="lg:hidden text-center mt-12 mb-6 text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] opacity-40 select-none">
           KNAW Labs
         </div>
       </main>
 
-      {/* Global Footnote - Fixed only on larger screens to avoid mobile nav clash */}
-      <div className="hidden lg:block fixed bottom-4 right-6 text-[10px] font-black text-slate-400/80 uppercase tracking-widest z-[100] pointer-events-none select-none drop-shadow-sm">
+      {/* Global Footnote - Fixed bottom-right for desktop ONLY */}
+      <div className="hidden lg:block fixed bottom-6 right-6 text-[10px] font-black text-slate-400/60 uppercase tracking-widest z-[100] pointer-events-none select-none">
         KNAW Labs
       </div>
 

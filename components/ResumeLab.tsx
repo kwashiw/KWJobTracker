@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Sparkles, CheckCircle2, TrendingUp, AlertCircle, Info, Upload, Loader2, FileUp, Edit3, Eye } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { FileText, Sparkles, CheckCircle2, TrendingUp, AlertCircle, Upload, Loader2, FileUp, Edit3, Eye, ExternalLink, Download, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { JobApplication, ResumeData } from '../types';
 
 interface ResumeLabProps {
@@ -13,11 +13,24 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   const [editing, setEditing] = useState(!resumeData.content);
   const [tempText, setTempText] = useState(resumeData.type === 'text' ? resumeData.content : '');
   const [isUploading, setIsUploading] = useState(false);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [isRendering, setIsRendering] = useState(false);
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfDocRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Sync tempText with resumeData when props change from outside (e.g., deletion)
   useEffect(() => {
-    // Set up PDF.js worker for text extraction
+    if (!editing) {
+      setTempText(resumeData.type === 'text' ? resumeData.content : '');
+    }
+  }, [resumeData.content, resumeData.type, editing]);
+
+  // Initialize PDF.js worker
+  useEffect(() => {
     // @ts-ignore
     if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
       // @ts-ignore
@@ -25,30 +38,104 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     }
   }, []);
 
-  // Effect to manage Blob URL lifecycle for PDF visualization
-  useEffect(() => {
-    if (resumeData.type === 'pdf' && resumeData.content) {
-      try {
-        // Convert DataURL back to Blob for cleaner iframe viewing
-        const parts = resumeData.content.split(',');
-        const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-        const bstr = atob(parts[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const url = URL.createObjectURL(blob);
-        setBlobUrl(url);
-        return () => URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error("Blob conversion error:", err);
-      }
-    } else {
-      setBlobUrl(null);
+  // Function to render a specific page to canvas
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current || !canvasRef.current || !containerRef.current) return;
+    
+    setIsRendering(true);
+    try {
+      const page = await pdfDocRef.current.getPage(pageNum);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      
+      const unscaledViewport = page.getViewport({ scale: 1 });
+      const containerWidth = containerRef.current.clientWidth;
+      const scale = containerWidth / unscaledViewport.width;
+      const viewport = page.getViewport({ scale: scale * 2 });
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      canvas.style.width = `${containerWidth}px`;
+      canvas.style.height = `${(containerWidth / unscaledViewport.width) * unscaledViewport.height}px`;
+
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+      };
+
+      await page.render(renderContext).promise;
+    } catch (err) {
+      console.error("Page render error:", err);
+    } finally {
+      setIsRendering(false);
     }
-  }, [resumeData.content, resumeData.type]);
+  }, []);
+
+  // Effect to load PDF document whenever content changes
+  useEffect(() => {
+    let active = true;
+    if (resumeData.type === 'pdf' && resumeData.content && !editing) {
+      const loadPdf = async () => {
+        try {
+          // @ts-ignore
+          if (!window.pdfjsLib) return;
+          
+          // @ts-ignore
+          const loadingTask = window.pdfjsLib.getDocument(resumeData.content);
+          const pdf = await loadingTask.promise;
+          
+          if (!active) {
+            pdf.destroy();
+            return;
+          }
+
+          pdfDocRef.current = pdf;
+          setNumPages(pdf.numPages);
+          setTimeout(() => {
+            if (active) renderPage(currentPage);
+          }, 50);
+        } catch (err) {
+          console.error("PDF load error:", err);
+        }
+      };
+      loadPdf();
+    } else {
+      // Cleanup PDF instance if exists
+      if (pdfDocRef.current) {
+        pdfDocRef.current.destroy?.();
+        pdfDocRef.current = null;
+      }
+      setNumPages(0);
+      
+      // Clear canvas if it's still mounted
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        canvasRef.current.style.width = '0px';
+        canvasRef.current.style.height = '0px';
+        canvasRef.current.width = 0;
+        canvasRef.current.height = 0;
+      }
+    }
+    return () => { active = false; };
+  }, [resumeData.content, resumeData.type, editing, renderPage, currentPage]);
+
+  useEffect(() => {
+    let timeoutId: any;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (pdfDocRef.current) renderPage(currentPage);
+      }, 150);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, [currentPage, renderPage]);
 
   const handleSaveText = () => {
     onSaveResume({
@@ -57,6 +144,27 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       extractedText: tempText
     });
     setEditing(false);
+  };
+
+  const handleClearResume = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (window.confirm("Remove your current resume profile? This will clear all analysis context.")) {
+      // Clear parent state first
+      onSaveResume({ type: 'text', content: '', extractedText: '' });
+      // Reset local UI states
+      setTempText('');
+      setEditing(true);
+      setCurrentPage(1);
+      setNumPages(0);
+      
+      // Explicit cleanup of PDF doc ref
+      if (pdfDocRef.current) {
+        pdfDocRef.current.destroy?.();
+        pdfDocRef.current = null;
+      }
+    }
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,15 +176,14 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       return;
     }
 
+    if (file.size > 4 * 1024 * 1024) {
+      alert("File too large. Please keep PDF resumes under 4MB.");
+      return;
+    }
+
     setIsUploading(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      
-      // @ts-ignore
-      if (!window.pdfjsLib) {
-        throw new Error("PDF Library not loaded correctly. Please refresh.");
-      }
-      
       // @ts-ignore
       const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
       let fullText = "";
@@ -96,11 +203,12 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
         });
         setEditing(false);
         setIsUploading(false);
+        setCurrentPage(1);
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error("PDF Parsing error:", err);
-      alert("Failed to parse PDF. Please try again or copy-paste text.");
+      console.error("Upload error:", err);
+      alert("Failed to process PDF.");
       setIsUploading(false);
     }
   };
@@ -112,7 +220,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Career Engine</h2>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">AI match scoring & technical prep</p>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">AI match scoring & tech prep</p>
         </div>
         <div className="flex items-center gap-2">
           <input type="file" accept=".pdf" ref={fileInputRef} className="hidden" onChange={handlePdfUpload} />
@@ -122,55 +230,98 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-xs flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-indigo-100"
           >
             {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
-            Upload Resume PDF
+            {resumeData.content ? 'Update PDF' : 'Upload Resume PDF'}
           </button>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Visual Resume Area */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[700px]">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                 {resumeData.type === 'pdf' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />} 
-                {resumeData.type === 'pdf' ? 'Formatted View' : 'Text Input'}
+                {resumeData.type === 'pdf' ? 'Visual Document' : 'Text Content'}
               </h3>
               <div className="flex items-center gap-2">
-                {editing ? (
-                  <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Changes</button>
-                ) : (
-                  <button onClick={() => { setTempText(resumeData.extractedText); setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Fix</button>
+                {resumeData.type === 'pdf' && numPages > 1 && (
+                  <div className="flex items-center gap-2 mr-4 bg-white border border-slate-200 rounded-lg p-1">
+                    <button 
+                      disabled={currentPage <= 1 || isRendering}
+                      onClick={() => { setCurrentPage(p => p - 1); }}
+                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-[10px] font-black text-slate-500 w-12 text-center uppercase">
+                      {currentPage} / {numPages}
+                    </span>
+                    <button 
+                      disabled={currentPage >= numPages || isRendering}
+                      onClick={() => { setCurrentPage(p => p + 1); }}
+                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
+                <div className="flex items-center gap-1">
+                  {editing ? (
+                    <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Profile</button>
+                  ) : (
+                    <button onClick={() => { setTempText(resumeData.extractedText); setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Edit</button>
+                  )}
+                  {resumeData.content && (
+                    <button 
+                      onClick={handleClearResume} 
+                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                      title="Remove Resume"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 bg-white relative min-h-[600px]">
+            <div 
+              ref={containerRef}
+              className="flex-1 bg-slate-200 relative flex flex-col items-center overflow-y-auto max-h-[800px] scroll-smooth"
+            >
               {editing ? (
-                <textarea 
-                  value={tempText}
-                  onChange={e => setTempText(e.target.value)}
-                  placeholder="Paste profile text here..."
-                  className="w-full h-full min-h-[600px] p-8 bg-white border-none focus:ring-0 text-xs font-medium text-slate-700 resize-none outline-none"
-                />
+                <div className="w-full h-full p-6">
+                  <textarea 
+                    value={tempText}
+                    onChange={e => setTempText(e.target.value)}
+                    placeholder="Paste profile text here..."
+                    className="w-full h-full min-h-[600px] p-8 bg-white border border-slate-300 rounded-3xl focus:ring-2 focus:ring-indigo-500/20 text-xs font-medium text-slate-700 resize-none outline-none shadow-sm"
+                  />
+                </div>
               ) : (
-                <div className="w-full h-full min-h-[600px] flex flex-col">
-                  {resumeData.type === 'pdf' && blobUrl ? (
-                    <iframe 
-                      src={blobUrl} 
-                      className="w-full h-full min-h-[600px] border-none"
-                      title="Resume Preview"
-                    />
+                <div className="w-full flex flex-col items-center">
+                  {resumeData.type === 'pdf' && resumeData.content ? (
+                    <div className="relative w-full bg-white shadow-lg">
+                      {isRendering && (
+                        <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
+                          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                        </div>
+                      )}
+                      <canvas 
+                        ref={canvasRef} 
+                        className="w-full h-auto block" 
+                      />
+                    </div>
                   ) : (
-                    <div className="p-8 h-full bg-white overflow-y-auto">
+                    <div className="w-full h-full min-h-[600px] flex items-center justify-center p-6">
                       {resumeData.content ? (
-                        <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                        <div className="w-full h-full bg-white rounded-3xl p-8 border border-slate-200 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-medium shadow-sm">
                           {resumeData.content}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                          <AlertCircle className="w-12 h-12 text-slate-200 mb-4" />
-                          <p className="text-slate-400 font-bold text-sm max-w-xs">Upload your resume PDF to see the formatted document view here.</p>
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <FileText className="w-16 h-16 text-slate-400/50 mb-6" />
+                          <h4 className="text-slate-400 font-black uppercase text-xs tracking-widest mb-2">No Profile Detected</h4>
+                          <p className="text-slate-400 font-bold text-[11px] max-w-xs leading-relaxed">Upload a PDF or paste text to enable AI fit analysis.</p>
                         </div>
                       )}
                     </div>
@@ -179,19 +330,19 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
               )}
             </div>
             
-            <div className="p-4 bg-slate-900 text-white/50 text-[8px] font-black uppercase tracking-[0.2em] text-center">
-               Extracted Content Strength: {resumeData.extractedText.length} Characters
+            <div className="p-4 bg-slate-900 text-white/50 text-[8px] font-black uppercase tracking-[0.2em] text-center flex items-center justify-center gap-2">
+               <CheckCircle2 className={`w-3 h-3 ${resumeData.extractedText.length > 50 ? 'text-emerald-400' : 'text-slate-600'}`} />
+               AI Analysis Context Strength: {resumeData.extractedText.length} Characters
             </div>
           </div>
         </div>
 
-        {/* Analytics Area */}
         <div className="lg:col-span-5 space-y-8">
           <section className="space-y-6">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">Pipeline Scores</h3>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">Role Leaderboard</h3>
             {analyzedJobs.length === 0 ? (
               <div className="bg-white/50 border-2 border-dashed border-slate-200 rounded-[2rem] p-10 text-center">
-                <p className="text-xs text-slate-400 font-bold leading-relaxed">Run a "Fit Check" in any job detail view to see comparative benchmarks here.</p>
+                <p className="text-xs text-slate-400 font-bold leading-relaxed">Run a "Compatibility Check" on a role to populate this leaderboard.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -199,7 +350,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                   <div key={job.id} className="bg-white border border-slate-200 p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 group hover:border-indigo-200 transition-all cursor-default">
                     <div className="w-12 h-12 rounded-xl bg-slate-900 flex flex-col items-center justify-center shrink-0">
                       <span className="text-[10px] font-black text-indigo-400 uppercase leading-none mb-0.5">{job.analysis?.score}%</span>
-                      <span className="text-[6px] font-black text-white uppercase tracking-widest">Fit</span>
+                      <span className="text-[6px] font-black text-white uppercase tracking-widest">Match</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-black text-slate-800 truncate">{job.title}</h4>
@@ -219,9 +370,9 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                <div className="bg-white text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
                  <Sparkles className="w-6 h-6" />
                </div>
-               <h3 className="text-xl font-black">Strategic Benchmarking</h3>
+               <h3 className="text-xl font-black">AI Strategy</h3>
                <p className="text-xs font-bold leading-relaxed opacity-80">
-                 Our system compares your profile against live job requirements. Aim for 80%+ compatibility before spending time on high-stakes interview prep.
+                 Our vector analysis engine compares your document rendering against the latent requirements of recruiters.
                </p>
              </div>
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />

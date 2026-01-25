@@ -11,31 +11,52 @@ interface ResumeLabProps {
 
 const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, onUpdateJob }) => {
   const [editing, setEditing] = useState(!resumeData.content);
-  const [tempText, setTempText] = useState(resumeData.type === 'text' ? resumeData.content : '');
+  const [tempText, setTempText] = useState(resumeData.content || '');
   const [isUploading, setIsUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
+  const [isEngineReady, setIsEngineReady] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfDocRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync tempText with resumeData when props change (like deletion)
+  // Poll for PDF.js engine to ensure it's available in production environments
   useEffect(() => {
-    if (!editing) {
-      setTempText(resumeData.type === 'text' ? resumeData.content : '');
+    const checkEngine = () => {
+      // @ts-ignore
+      const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+      if (pdfjs) {
+        if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+          pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        setIsEngineReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (!checkEngine()) {
+      const interval = setInterval(() => {
+        if (checkEngine()) clearInterval(interval);
+      }, 500);
+      return () => clearInterval(interval);
     }
-  }, [resumeData.content, resumeData.type, editing]);
+  }, []);
+
+  // Sync tempText with resumeData prop changes (essential for clearing data correctly)
+  useEffect(() => {
+    // We sync if content is cleared, or if we are not currently manual editing
+    if (!resumeData.content || !editing) {
+      setTempText(resumeData.content || '');
+    }
+  }, [resumeData.content, editing]);
 
   const getPdfjs = () => {
     // @ts-ignore
-    const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-    if (pdfjs && !pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-    return pdfjs;
+    return window.pdfjsLib || window['pdfjs-dist/build/pdf'];
   };
 
   const renderPage = useCallback(async (pageNum: number) => {
@@ -86,7 +107,10 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       };
       loadPdf();
     } else {
-      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
+      if (pdfDocRef.current) { 
+        pdfDocRef.current.destroy?.(); 
+        pdfDocRef.current = null; 
+      }
       setNumPages(0);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
@@ -98,7 +122,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       }
     }
     return () => { active = false; };
-  }, [resumeData.content, resumeData.type, editing, renderPage, currentPage]);
+  }, [resumeData.content, resumeData.type, editing, renderPage, currentPage, isEngineReady]);
 
   useEffect(() => {
     let timeoutId: any;
@@ -119,25 +143,32 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     e.preventDefault();
     e.stopPropagation();
     if (window.confirm("Remove your current resume profile? This will clear all match analysis context.")) {
+      // First clear parent state
       onSaveResume({ type: 'text', content: '', extractedText: '' });
+      // Then clean local state
       setTempText('');
       setEditing(true);
       setCurrentPage(1);
       setNumPages(0);
-      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
+      if (pdfDocRef.current) { 
+        pdfDocRef.current.destroy?.(); 
+        pdfDocRef.current = null; 
+      }
     }
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const pdfjs = getPdfjs();
-    if (!file || !pdfjs) {
-      if (!pdfjs) alert("PDF Engine loading. Please try again in a few seconds.");
+    
+    if (!file) return;
+    if (!pdfjs || !isEngineReady) {
+      alert("Career engine is still warming up. Please try again in 2 seconds.");
       return;
     }
 
     if (file.type !== 'application/pdf') { alert("Please upload a PDF file."); return; }
-    if (file.size > 4 * 1024 * 1024) { alert("File too large. Please keep PDF resumes under 4MB."); return; }
+    if (file.size > 4 * 1024 * 1024) { alert("File too large. Please keep PDF resumes under 4MB for optimal performance."); return; }
 
     setIsUploading(true);
     try {
@@ -159,7 +190,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error("PDF engine error:", err);
+      console.error("PDF extraction error:", err);
       alert("Failed to process PDF. Try another file or paste text manually.");
       setIsUploading(false);
     }
@@ -219,7 +250,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                   {editing ? (
                     <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Profile</button>
                   ) : (
-                    <button onClick={() => { setTempText(resumeData.extractedText); setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Edit</button>
+                    <button onClick={() => { setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Edit</button>
                   )}
                   {resumeData.content && (
                     <button 

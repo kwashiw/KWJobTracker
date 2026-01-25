@@ -22,23 +22,22 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   const pdfDocRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync tempText with resumeData when props change from outside (e.g., deletion)
+  // Sync tempText with resumeData when props change (like deletion)
   useEffect(() => {
     if (!editing) {
       setTempText(resumeData.type === 'text' ? resumeData.content : '');
     }
   }, [resumeData.content, resumeData.type, editing]);
 
-  // Initialize PDF.js worker
-  useEffect(() => {
+  const getPdfjs = () => {
     // @ts-ignore
-    if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      // @ts-ignore
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+    if (pdfjs && !pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
-  }, []);
+    return pdfjs;
+  };
 
-  // Function to render a specific page to canvas
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current || !canvasRef.current || !containerRef.current) return;
     
@@ -60,12 +59,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       canvas.style.width = `${containerWidth}px`;
       canvas.style.height = `${(containerWidth / unscaledViewport.width) * unscaledViewport.height}px`;
 
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-
-      await page.render(renderContext).promise;
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
     } catch (err) {
       console.error("Page render error:", err);
     } finally {
@@ -73,43 +67,27 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     }
   }, []);
 
-  // Effect to load PDF document whenever content changes
   useEffect(() => {
     let active = true;
-    if (resumeData.type === 'pdf' && resumeData.content && !editing) {
+    const pdfjs = getPdfjs();
+
+    if (resumeData.type === 'pdf' && resumeData.content && !editing && pdfjs) {
       const loadPdf = async () => {
         try {
-          // @ts-ignore
-          if (!window.pdfjsLib) return;
-          
-          // @ts-ignore
-          const loadingTask = window.pdfjsLib.getDocument(resumeData.content);
+          const loadingTask = pdfjs.getDocument(resumeData.content);
           const pdf = await loadingTask.promise;
-          
-          if (!active) {
-            pdf.destroy();
-            return;
-          }
-
+          if (!active) { pdf.destroy(); return; }
           pdfDocRef.current = pdf;
           setNumPages(pdf.numPages);
-          setTimeout(() => {
-            if (active) renderPage(currentPage);
-          }, 50);
+          setTimeout(() => { if (active) renderPage(currentPage); }, 100);
         } catch (err) {
           console.error("PDF load error:", err);
         }
       };
       loadPdf();
     } else {
-      // Cleanup PDF instance if exists
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy?.();
-        pdfDocRef.current = null;
-      }
+      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
       setNumPages(0);
-      
-      // Clear canvas if it's still mounted
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -126,89 +104,63 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     let timeoutId: any;
     const handleResize = () => {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (pdfDocRef.current) renderPage(currentPage);
-      }, 150);
+      timeoutId = setTimeout(() => { if (pdfDocRef.current) renderPage(currentPage); }, 150);
     };
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timeoutId);
-    };
+    return () => { window.removeEventListener('resize', handleResize); clearTimeout(timeoutId); };
   }, [currentPage, renderPage]);
 
   const handleSaveText = () => {
-    onSaveResume({
-      type: 'text',
-      content: tempText,
-      extractedText: tempText
-    });
+    onSaveResume({ type: 'text', content: tempText, extractedText: tempText });
     setEditing(false);
   };
 
   const handleClearResume = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (window.confirm("Remove your current resume profile? This will clear all analysis context.")) {
-      // Clear parent state first
+    if (window.confirm("Remove your current resume profile? This will clear all match analysis context.")) {
       onSaveResume({ type: 'text', content: '', extractedText: '' });
-      // Reset local UI states
       setTempText('');
       setEditing(true);
       setCurrentPage(1);
       setNumPages(0);
-      
-      // Explicit cleanup of PDF doc ref
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy?.();
-        pdfDocRef.current = null;
-      }
+      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
     }
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      alert("Please upload a PDF file.");
+    const pdfjs = getPdfjs();
+    if (!file || !pdfjs) {
+      if (!pdfjs) alert("PDF Engine loading. Please try again in a few seconds.");
       return;
     }
 
-    if (file.size > 4 * 1024 * 1024) {
-      alert("File too large. Please keep PDF resumes under 4MB.");
-      return;
-    }
+    if (file.type !== 'application/pdf') { alert("Please upload a PDF file."); return; }
+    if (file.size > 4 * 1024 * 1024) { alert("File too large. Please keep PDF resumes under 4MB."); return; }
 
     setIsUploading(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // @ts-ignore
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
       let fullText = "";
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        const strings = content.items.map((item: any) => item.str);
-        fullText += strings.join(" ") + "\n";
+        fullText += content.items.map((item: any) => item.str || "").join(" ") + "\n";
       }
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        onSaveResume({
-          type: 'pdf',
-          content: event.target?.result as string, 
-          extractedText: fullText
-        });
+        onSaveResume({ type: 'pdf', content: event.target?.result as string, extractedText: fullText });
         setEditing(false);
         setIsUploading(false);
         setCurrentPage(1);
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error("Upload error:", err);
-      alert("Failed to process PDF.");
+      console.error("PDF engine error:", err);
+      alert("Failed to process PDF. Try another file or paste text manually.");
       setIsUploading(false);
     }
   };
@@ -253,9 +205,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="text-[10px] font-black text-slate-500 w-12 text-center uppercase">
-                      {currentPage} / {numPages}
-                    </span>
+                    <span className="text-[10px] font-black text-slate-500 w-12 text-center uppercase">{currentPage} / {numPages}</span>
                     <button 
                       disabled={currentPage >= numPages || isRendering}
                       onClick={() => { setCurrentPage(p => p + 1); }}
@@ -284,10 +234,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
               </div>
             </div>
 
-            <div 
-              ref={containerRef}
-              className="flex-1 bg-slate-200 relative flex flex-col items-center overflow-y-auto max-h-[800px] scroll-smooth"
-            >
+            <div ref={containerRef} className="flex-1 bg-slate-200 relative flex flex-col items-center overflow-y-auto max-h-[800px] scroll-smooth">
               {editing ? (
                 <div className="w-full h-full p-6">
                   <textarea 
@@ -301,29 +248,16 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                 <div className="w-full flex flex-col items-center">
                   {resumeData.type === 'pdf' && resumeData.content ? (
                     <div className="relative w-full bg-white shadow-lg">
-                      {isRendering && (
-                        <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
-                          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                        </div>
-                      )}
-                      <canvas 
-                        ref={canvasRef} 
-                        className="w-full h-auto block" 
-                      />
+                      {isRendering && <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>}
+                      <canvas ref={canvasRef} className="w-full h-auto block" />
                     </div>
                   ) : (
-                    <div className="w-full h-full min-h-[600px] flex items-center justify-center p-6">
-                      {resumeData.content ? (
-                        <div className="w-full h-full bg-white rounded-3xl p-8 border border-slate-200 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap font-medium shadow-sm">
-                          {resumeData.content}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <FileText className="w-16 h-16 text-slate-400/50 mb-6" />
-                          <h4 className="text-slate-400 font-black uppercase text-xs tracking-widest mb-2">No Profile Detected</h4>
-                          <p className="text-slate-400 font-bold text-[11px] max-w-xs leading-relaxed">Upload a PDF or paste text to enable AI fit analysis.</p>
-                        </div>
-                      )}
+                    <div className="w-full h-full min-h-[600px] flex items-center justify-center p-6 text-center">
+                      <div className="flex flex-col items-center">
+                        <FileText className="w-16 h-16 text-slate-400/50 mb-6" />
+                        <h4 className="text-slate-400 font-black uppercase text-xs tracking-widest mb-2">No Profile Detected</h4>
+                        <p className="text-slate-400 font-bold text-[11px] max-w-xs leading-relaxed">Upload a PDF or paste text to enable AI fit analysis.</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -356,9 +290,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                       <h4 className="text-sm font-black text-slate-800 truncate">{job.title}</h4>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.company}</p>
                     </div>
-                    <div className="shrink-0">
-                       <CheckCircle2 className={`w-5 h-5 ${(job.analysis?.score || 0) > 80 ? 'text-emerald-500' : 'text-slate-200'}`} />
-                    </div>
+                    <CheckCircle2 className={`w-5 h-5 shrink-0 ${(job.analysis?.score || 0) > 80 ? 'text-emerald-500' : 'text-slate-200'}`} />
                   </div>
                 ))}
               </div>
@@ -367,13 +299,9 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
 
           <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100">
              <div className="relative z-10 space-y-4">
-               <div className="bg-white text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
-                 <Sparkles className="w-6 h-6" />
-               </div>
+               <div className="bg-white text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"><Sparkles className="w-6 h-6" /></div>
                <h3 className="text-xl font-black">AI Strategy</h3>
-               <p className="text-xs font-bold leading-relaxed opacity-80">
-                 Our vector analysis engine compares your document rendering against the latent requirements of recruiters.
-               </p>
+               <p className="text-xs font-bold leading-relaxed opacity-80">Our vector analysis engine compares your document rendering against the latent requirements of recruiters.</p>
              </div>
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
           </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Trash2, ExternalLink, Calendar, Briefcase, TrendingUp, Clock, 
   Plus, CheckCircle2, Circle, Link as LinkIcon, User, MapPin, Sparkles, Loader2,
-  Bell, BellOff, Send, Globe, AlertTriangle
+  Bell, BellOff, Send, Globe, AlertTriangle, Coffee
 } from 'lucide-react';
 import { JobApplication, JobStatus, Interview, TodoItem } from '../types';
 import { analyzeJobMatch } from '../services/gemini';
@@ -87,20 +87,25 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
     setError(null);
     try {
       const result = await analyzeJobMatch(resume, job.description);
-      // Ensure the result actually has data before saving
       if (result.strengths.length === 0 && result.gaps.length === 0 && result.score === 0) {
-        throw new Error("Analysis generated an empty result. This might be due to content filtering.");
+        throw new Error("Analysis failed to generate results. Please try again.");
       }
       onUpdateJob({ analysis: result });
     } catch (err: any) {
       console.error(err);
       const msg = err?.message || "";
-      if (msg.includes('429') || err?.status === 429) {
-        setError("Rate limit reached. The AI engine is busy—please wait 60 seconds.");
-      } else if (msg.includes('blocked') || msg.includes('safety')) {
-        setError("Analysis blocked. The AI detected potentially sensitive content in your resume.");
+      const status = err?.status || err?.code;
+      
+      if (msg.toLowerCase().includes('overloaded') || status === 503) {
+        setError("AI Engine Overloaded: Google's servers are currently at capacity. We tried retrying, but they're still busy. Please try again in a few minutes.");
+      } else if (msg.toLowerCase().includes('429') || status === 429) {
+        setError("Rate Limit Reached: Too many requests at once. Please wait about 60 seconds before retrying.");
+      } else if (msg.toLowerCase().includes('blocked') || msg.toLowerCase().includes('safety')) {
+        setError("Content Blocked: The AI safety filters flagged your resume content. Try simplifying the text.");
       } else {
-        setError(`Analysis Error: ${msg.slice(0, 100) || "The engine failed to process this request. Check your internet connection."}`);
+        // Show a clean message even for generic errors
+        const cleanMsg = msg.length > 100 ? msg.slice(0, 100) + "..." : msg;
+        setError(`Analysis Error: ${cleanMsg || "The service is temporarily unavailable. Please check your connection."}`);
       }
     } finally {
       setIsAnalyzing(false);
@@ -154,7 +159,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                         disabled={isAnalyzing} 
                         className="text-[8px] sm:text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
                       >
-                        {isAnalyzing ? 'Thinking...' : (job.analysis ? 'Re-Analyze' : 'Run Check')}
+                        {isAnalyzing ? 'Thinking Deeply...' : (job.analysis ? 'Re-Analyze' : 'Run Fit Check')}
                        </button>
                     </div>
                   </div>
@@ -164,8 +169,13 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
               {error && (
                 <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 animate-in slide-in-from-top-2">
-                  <AlertTriangle className="w-5 h-5 shrink-0" />
-                  <p className="text-xs font-bold leading-tight">{error}</p>
+                  <div className="p-2 bg-rose-100 rounded-lg shrink-0">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider mb-0.5">Engine Hiccup</p>
+                    <p className="text-[11px] font-bold leading-tight opacity-80">{error}</p>
+                  </div>
                 </div>
               )}
 

@@ -38,24 +38,45 @@ function safeParseJson<T>(text: string | undefined, defaultValue: T): T {
 }
 
 /**
- * Robust retry utility with exponential backoff for handling 429 errors.
+ * Robust retry utility with exponential backoff for handling 429, 503, and 504 errors.
  */
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 2000): Promise<T> {
+async function callWithRetry<T>(fn: () => Promise<T>, retries = 5, delay = 2000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
-    const isRateLimit = 
-      error?.message?.includes('429') || 
-      error?.status === 429 || 
-      error?.code === 429 ||
-      error?.message?.includes('Too Many Requests');
+    // Check for transient errors: 429 (Rate Limit), 503 (Overloaded), 504 (Timeout)
+    const errorMsg = error?.message || "";
+    const status = error?.status || error?.code;
+    
+    const isRetryable = 
+      errorMsg.includes('429') || 
+      status === 429 || 
+      errorMsg.includes('503') || 
+      status === 503 ||
+      errorMsg.includes('504') ||
+      status === 504 ||
+      errorMsg.toLowerCase().includes('overloaded') ||
+      errorMsg.toLowerCase().includes('too many requests');
       
-    if (isRateLimit && retries > 0) {
+    if (isRetryable && retries > 0) {
       const backoff = delay + Math.random() * 1000; // Add jitter
-      console.warn(`Rate limit hit (429). Retrying in ${Math.round(backoff)}ms... (${retries} retries left)`);
+      console.warn(`Transient error (${status}). Retrying in ${Math.round(backoff)}ms... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, backoff));
       return callWithRetry(fn, retries - 1, delay * 2);
     }
+    
+    // Attempt to extract a cleaner message if it's a stringified JSON error
+    if (typeof errorMsg === 'string' && errorMsg.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(errorMsg);
+        if (parsed.error?.message) {
+          error.message = parsed.error.message;
+        }
+      } catch (e) {
+        // Keep original if parsing fails
+      }
+    }
+    
     throw error;
   }
 }
@@ -82,7 +103,6 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
 
     const data = safeParseJson<ExtractedJobData>(response.text, { company: "Unknown", salaryRange: "Not found", description: "" });
     
-    // Extract grounding URLs as required by API guidelines using safe type assertions
     const candidates = (response as any).candidates;
     const groundingMetadata = candidates?.[0]?.groundingMetadata;
     const chunks = groundingMetadata?.groundingChunks;
@@ -121,7 +141,6 @@ export const extractJobDetails = async (description: string): Promise<ExtractedJ
 
 export const analyzeJobMatch = async (resume: string, jobDescription: string): Promise<MatchAnalysisResult> => {
   return callWithRetry(async () => {
-    // We use a high thinkingBudget for "flawless" analysis quality on the Flash model
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Perform a detailed compatibility analysis between this professional Resume and Job Description.
@@ -132,7 +151,7 @@ export const analyzeJobMatch = async (resume: string, jobDescription: string): P
       JOB DESCRIPTION:
       ${jobDescription}
       
-      Instructions: Be objective and critical. If skills are missing, list them as gaps. High scores (90+) should be reserved for perfect skill-for-skill matches.`,
+      Instructions: Be objective and critical. If skills are missing, list them as gaps.`,
       config: {
         thinkingConfig: { thinkingBudget: 8000 },
         responseMimeType: "application/json",
@@ -148,7 +167,7 @@ export const analyzeJobMatch = async (resume: string, jobDescription: string): P
       }
     });
 
-    return safeParseJson<MatchAnalysisResult>(response.text, { score: 0, strengths: [], gaps: ["Parsing error"] });
+    return safeParseJson<MatchAnalysisResult>(response.text, { score: 0, strengths: [], gaps: ["Analysis failed to parse."] });
   });
 };
 
@@ -156,7 +175,7 @@ export const compareOffers = async (offers: { title: string, company: string, de
   return callWithRetry(async () => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Rank these offers and provide deep strategic reasoning for the ranking: ${JSON.stringify(offers)}`,
+      contents: `Rank these offers: ${JSON.stringify(offers)}`,
       config: {
         thinkingConfig: { thinkingBudget: 4000 },
         responseMimeType: "application/json",

@@ -23,7 +23,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   const pdfDocRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Poll for PDF.js engine to ensure it's available in production environments
+  // Poll for PDF.js engine
   useEffect(() => {
     const checkEngine = () => {
       // @ts-ignore
@@ -46,9 +46,8 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     }
   }, []);
 
-  // Sync tempText with resumeData prop changes (essential for clearing data correctly)
+  // Sync tempText with resumeData prop changes
   useEffect(() => {
-    // We sync if content is cleared, or if we are not currently manual editing
     if (!resumeData.content || !editing) {
       setTempText(resumeData.content || '');
     }
@@ -143,9 +142,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     e.preventDefault();
     e.stopPropagation();
     if (window.confirm("Remove your current resume profile? This will clear all match analysis context.")) {
-      // First clear parent state
       onSaveResume({ type: 'text', content: '', extractedText: '' });
-      // Then clean local state
       setTempText('');
       setEditing(true);
       setCurrentPage(1);
@@ -224,7 +221,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                 {resumeData.type === 'pdf' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />} 
-                {resumeData.type === 'pdf' ? 'Visual Document' : 'Text Content'}
+                {resumeData.type === 'pdf' ? 'Visual Document' : 'Profile Profile'}
               </h3>
               <div className="flex items-center gap-2">
                 {resumeData.type === 'pdf' && numPages > 1 && (
@@ -271,19 +268,23 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                   <textarea 
                     value={tempText}
                     onChange={e => setTempText(e.target.value)}
-                    placeholder="Paste profile text here..."
+                    placeholder="Paste resume profile text here..."
                     className="w-full h-full min-h-[600px] p-8 bg-white border border-slate-300 rounded-3xl focus:ring-2 focus:ring-indigo-500/20 text-xs font-medium text-slate-700 resize-none outline-none shadow-sm"
                   />
                 </div>
               ) : (
-                <div className="w-full flex flex-col items-center">
+                <div className="w-full h-full flex flex-col items-center bg-white">
                   {resumeData.type === 'pdf' && resumeData.content ? (
                     <div className="relative w-full bg-white shadow-lg">
                       {isRendering && <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>}
                       <canvas ref={canvasRef} className="w-full h-auto block" />
                     </div>
+                  ) : resumeData.content ? (
+                    <div className="w-full p-10 sm:p-14 bg-white text-slate-800 font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap max-w-4xl mx-auto shadow-sm">
+                      {resumeData.content}
+                    </div>
                   ) : (
-                    <div className="w-full h-full min-h-[600px] flex items-center justify-center p-6 text-center">
+                    <div className="w-full h-full min-h-[600px] flex items-center justify-center p-6 text-center bg-slate-100">
                       <div className="flex flex-col items-center">
                         <FileText className="w-16 h-16 text-slate-400/50 mb-6" />
                         <h4 className="text-slate-400 font-black uppercase text-xs tracking-widest mb-2">No Profile Detected</h4>

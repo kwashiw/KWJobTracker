@@ -1,5 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+// Satisfy TypeScript compiler for the environment variable injected by Vite/GitHub Actions
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export interface ExtractedJobData {
@@ -58,14 +65,25 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
       }
     });
 
-    const data = JSON.parse(response.text || "{}") as ExtractedJobData;
+    let data: ExtractedJobData = { company: "Unknown", salaryRange: "Not found", description: "" };
     
-    // Extract grounding URLs as required by API guidelines
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    try {
+      if (response.text) {
+        data = JSON.parse(response.text) as ExtractedJobData;
+      }
+    } catch (e) {
+      console.error("Failed to parse JSON response from search grounding:", e);
+    }
+    
+    // Extract grounding URLs as required by API guidelines using safe type assertions
+    const candidates = (response as any).candidates;
+    const groundingMetadata = candidates?.[0]?.groundingMetadata;
+    const chunks = groundingMetadata?.groundingChunks;
+    
     if (chunks && Array.isArray(chunks)) {
       data.sources = chunks
-        .filter(c => c.web)
-        .map(c => ({ uri: c.web.uri, title: c.web.title }));
+        .filter((c: any) => c.web)
+        .map((c: any) => ({ uri: c.web.uri, title: c.web.title }));
     }
     
     return data;
@@ -74,7 +92,6 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
 
 export const extractJobDetails = async (description: string): Promise<ExtractedJobData> => {
   return callWithRetry(async () => {
-    // Flash is more than capable for extraction and has better rate limits
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Extract the company name and salary range from this job description:\n\n${description}`,
@@ -97,7 +114,6 @@ export const extractJobDetails = async (description: string): Promise<ExtractedJ
 
 export const analyzeJobMatch = async (resume: string, jobDescription: string): Promise<MatchAnalysisResult> => {
   return callWithRetry(async () => {
-    // Using Flash instead of Pro for matching to avoid 429s while maintaining high accuracy
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyze fit between Resume and Job. RESUME:\n${resume}\n\nJOB:\n${jobDescription}`,

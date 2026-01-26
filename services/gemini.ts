@@ -23,6 +23,21 @@ export interface MatchAnalysisResult {
 }
 
 /**
+ * Strips markdown code blocks and safely parses JSON.
+ */
+function safeParseJson<T>(text: string | undefined, defaultValue: T): T {
+  if (!text) return defaultValue;
+  try {
+    // Remove markdown code blocks if present
+    const cleanText = text.replace(/```json\n?|```/g, "").trim();
+    return JSON.parse(cleanText) as T;
+  } catch (e) {
+    console.error("JSON Parsing Error:", e, "Raw text:", text);
+    return defaultValue;
+  }
+}
+
+/**
  * Robust retry utility with exponential backoff for handling 429 errors.
  */
 async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 2000): Promise<T> {
@@ -65,15 +80,7 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
       }
     });
 
-    let data: ExtractedJobData = { company: "Unknown", salaryRange: "Not found", description: "" };
-    
-    try {
-      if (response.text) {
-        data = JSON.parse(response.text) as ExtractedJobData;
-      }
-    } catch (e) {
-      console.error("Failed to parse JSON response from search grounding:", e);
-    }
+    const data = safeParseJson<ExtractedJobData>(response.text, { company: "Unknown", salaryRange: "Not found", description: "" });
     
     // Extract grounding URLs as required by API guidelines using safe type assertions
     const candidates = (response as any).candidates;
@@ -108,16 +115,26 @@ export const extractJobDetails = async (description: string): Promise<ExtractedJ
       }
     });
 
-    return JSON.parse(response.text || "{}") as ExtractedJobData;
+    return safeParseJson<ExtractedJobData>(response.text, { company: "Unknown Company", salaryRange: "Not extracted" });
   }).catch(() => ({ company: "Unknown Company", salaryRange: "Not extracted" }));
 };
 
 export const analyzeJobMatch = async (resume: string, jobDescription: string): Promise<MatchAnalysisResult> => {
   return callWithRetry(async () => {
+    // We use a high thinkingBudget for "flawless" analysis quality on the Flash model
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Analyze fit between Resume and Job. RESUME:\n${resume}\n\nJOB:\n${jobDescription}`,
+      contents: `Perform a detailed compatibility analysis between this professional Resume and Job Description.
+      
+      RESUME:
+      ${resume}
+      
+      JOB DESCRIPTION:
+      ${jobDescription}
+      
+      Instructions: Be objective and critical. If skills are missing, list them as gaps. High scores (90+) should be reserved for perfect skill-for-skill matches.`,
       config: {
+        thinkingConfig: { thinkingBudget: 8000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -131,7 +148,7 @@ export const analyzeJobMatch = async (resume: string, jobDescription: string): P
       }
     });
 
-    return JSON.parse(response.text || "{}") as MatchAnalysisResult;
+    return safeParseJson<MatchAnalysisResult>(response.text, { score: 0, strengths: [], gaps: ["Parsing error"] });
   });
 };
 
@@ -139,8 +156,9 @@ export const compareOffers = async (offers: { title: string, company: string, de
   return callWithRetry(async () => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Rank these offers: ${JSON.stringify(offers)}`,
+      contents: `Rank these offers and provide deep strategic reasoning for the ranking: ${JSON.stringify(offers)}`,
       config: {
+        thinkingConfig: { thinkingBudget: 4000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -160,6 +178,6 @@ export const compareOffers = async (offers: { title: string, company: string, de
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return safeParseJson<any[]>(response.text, []);
   });
 };

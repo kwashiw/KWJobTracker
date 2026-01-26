@@ -87,13 +87,20 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
     setError(null);
     try {
       const result = await analyzeJobMatch(resume, job.description);
+      // Ensure the result actually has data before saving
+      if (result.strengths.length === 0 && result.gaps.length === 0 && result.score === 0) {
+        throw new Error("Analysis generated an empty result. This might be due to content filtering.");
+      }
       onUpdateJob({ analysis: result });
     } catch (err: any) {
       console.error(err);
-      if (err?.message?.includes('429') || err?.status === 429) {
-        setError("Rate limit reached. The AI engine is busy—please wait a few moments before retrying.");
+      const msg = err?.message || "";
+      if (msg.includes('429') || err?.status === 429) {
+        setError("Rate limit reached. The AI engine is busy—please wait 60 seconds.");
+      } else if (msg.includes('blocked') || msg.includes('safety')) {
+        setError("Analysis blocked. The AI detected potentially sensitive content in your resume.");
       } else {
-        setError("Analysis engine offline. Please check your connection or resume content.");
+        setError(`Analysis Error: ${msg.slice(0, 100) || "The engine failed to process this request. Check your internet connection."}`);
       }
     } finally {
       setIsAnalyzing(false);
@@ -147,8 +154,8 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                         disabled={isAnalyzing} 
                         className="text-[8px] sm:text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
                       >
-                        {isAnalyzing ? 'Processing...' : (job.analysis ? 'Re-Analyze' : 'Run Check')}
-                      </button>
+                        {isAnalyzing ? 'Thinking...' : (job.analysis ? 'Re-Analyze' : 'Run Check')}
+                       </button>
                     </div>
                   </div>
                 </div>

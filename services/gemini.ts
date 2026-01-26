@@ -6,6 +6,7 @@ export interface ExtractedJobData {
   company: string;
   salaryRange: string;
   description?: string;
+  sources?: { uri: string; title: string }[];
 }
 
 export interface MatchAnalysisResult {
@@ -17,14 +18,20 @@ export interface MatchAnalysisResult {
 /**
  * Robust retry utility with exponential backoff for handling 429 errors.
  */
-async function callWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+async function callWithRetry<T>(fn: () => Promise<T>, retries = 4, delay = 2000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
-    const isRateLimit = error?.message?.includes('429') || error?.status === 429 || error?.code === 429;
+    const isRateLimit = 
+      error?.message?.includes('429') || 
+      error?.status === 429 || 
+      error?.code === 429 ||
+      error?.message?.includes('Too Many Requests');
+      
     if (isRateLimit && retries > 0) {
-      console.warn(`Rate limit hit (429). Retrying in ${delay}ms... (${retries} retries left)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      const backoff = delay + Math.random() * 1000; // Add jitter
+      console.warn(`Rate limit hit (429). Retrying in ${Math.round(backoff)}ms... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, backoff));
       return callWithRetry(fn, retries - 1, delay * 2);
     }
     throw error;
@@ -35,7 +42,7 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
   return callWithRetry(async () => {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Find the job title, company name, salary range, and a summary of the job description for this URL: ${url}`,
+      contents: `Analyze this URL for job details including title, company name, salary range, and a summary: ${url}`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -44,22 +51,33 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
           properties: {
             company: { type: Type.STRING },
             salaryRange: { type: Type.STRING },
-            description: { type: Type.STRING, description: "A detailed summary of the job requirements and role." }
+            description: { type: Type.STRING, description: "A summary of requirements." }
           },
           required: ["company", "salaryRange", "description"]
         }
       }
     });
 
-    return JSON.parse(response.text || "{}") as ExtractedJobData;
+    const data = JSON.parse(response.text || "{}") as ExtractedJobData;
+    
+    // Extract grounding URLs as required by API guidelines
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (chunks && Array.isArray(chunks)) {
+      data.sources = chunks
+        .filter(c => c.web)
+        .map(c => ({ uri: c.web.uri, title: c.web.title }));
+    }
+    
+    return data;
   });
 };
 
 export const extractJobDetails = async (description: string): Promise<ExtractedJobData> => {
   return callWithRetry(async () => {
+    // Flash is more than capable for extraction and has better rate limits
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extract the company name and salary range (e.g., "$100k - $150k" or "Not specified") from the following job description:\n\n${description}`,
+      contents: `Extract the company name and salary range from this job description:\n\n${description}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -79,17 +97,18 @@ export const extractJobDetails = async (description: string): Promise<ExtractedJ
 
 export const analyzeJobMatch = async (resume: string, jobDescription: string): Promise<MatchAnalysisResult> => {
   return callWithRetry(async () => {
+    // Using Flash instead of Pro for matching to avoid 429s while maintaining high accuracy
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `Compare the following Resume and Job Description. Score the match out of 100 and identify top strengths and critical gaps.\n\nRESUME:\n${resume}\n\nJOB DESCRIPTION:\n${jobDescription}`,
+      model: "gemini-3-flash-preview",
+      contents: `Analyze fit between Resume and Job. RESUME:\n${resume}\n\nJOB:\n${jobDescription}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            score: { type: Type.NUMBER, description: "A percentage from 0 to 100." },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of skills/experiences that match well." },
-            gaps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Missing skills or areas to prepare for." }
+            score: { type: Type.NUMBER },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            gaps: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["score", "strengths", "gaps"]
         }
@@ -103,8 +122,8 @@ export const analyzeJobMatch = async (resume: string, jobDescription: string): P
 export const compareOffers = async (offers: { title: string, company: string, description: string }[]) => {
   return callWithRetry(async () => {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `Analyze these competing job offers and rank them based on long-term career growth, compensation potential, and role impact. Provide a JSON list ranking them.\n\nOFFERS:\n${JSON.stringify(offers)}`,
+      model: "gemini-3-flash-preview",
+      contents: `Rank these offers: ${JSON.stringify(offers)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -115,7 +134,7 @@ export const compareOffers = async (offers: { title: string, company: string, de
               rank: { type: Type.NUMBER },
               company: { type: Type.STRING },
               title: { type: Type.STRING },
-              why: { type: Type.STRING, description: "Why this rank?" },
+              why: { type: Type.STRING },
               pros: { type: Type.ARRAY, items: { type: Type.STRING } },
               cons: { type: Type.ARRAY, items: { type: Type.STRING } }
             },

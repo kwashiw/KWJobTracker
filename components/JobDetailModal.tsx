@@ -90,10 +90,10 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
       onUpdateJob({ analysis: result });
     } catch (err: any) {
       console.error(err);
-      if (err?.message?.includes('429')) {
-        setError("Rate limit hit. Wait a minute and try again.");
+      if (err?.message?.includes('429') || err?.status === 429) {
+        setError("Rate limit reached. The AI engine is busy—please wait a few moments before retrying.");
       } else {
-        setError("Analysis failed. Check your API key or connection.");
+        setError("Analysis engine offline. Please check your connection or resume content.");
       }
     } finally {
       setIsAnalyzing(false);
@@ -132,22 +132,22 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
             {/* Main Content Area */}
             <div className="lg:col-span-8 space-y-6">
               
-              {/* Ultra Compact AI Match (Mobile Friendly) */}
+              {/* AI Match Display */}
               <div className="bg-slate-900 rounded-2xl p-3 sm:p-5 text-white flex items-center justify-between gap-4 shadow-xl border border-slate-800">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${job.analysis ? 'bg-indigo-600' : 'bg-slate-800'}`}>
                     <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Match Compatibility</h3>
+                    <h3 className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">AI Compatibility Score</h3>
                     <div className="flex items-center gap-2">
-                       <p className="text-xs sm:text-sm font-black">{job.analysis ? `${job.analysis.score}% Fit` : 'Check Required'}</p>
+                       <p className="text-xs sm:text-sm font-black">{job.analysis ? `${job.analysis.score}% Fit` : 'Ready to Analyze'}</p>
                        <button 
                         onClick={runAnalysis} 
                         disabled={isAnalyzing} 
                         className="text-[8px] sm:text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
                       >
-                        {isAnalyzing ? 'Processing...' : (job.analysis ? 'Refresh' : 'Analyze Now')}
+                        {isAnalyzing ? 'Processing...' : (job.analysis ? 'Re-Analyze' : 'Run Check')}
                       </button>
                     </div>
                   </div>
@@ -156,26 +156,26 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
               </div>
 
               {error && (
-                <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl flex items-center gap-3 text-rose-600 animate-in slide-in-from-top-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest">{error}</p>
+                <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 animate-in slide-in-from-top-2">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <p className="text-xs font-bold leading-tight">{error}</p>
                 </div>
               )}
 
               {job.analysis && (
                 <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <div className="bg-emerald-50 border border-emerald-100 p-2 sm:p-3 rounded-xl">
-                    <h4 className="text-[7px] sm:text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1 sm:mb-1.5">Top Matches</h4>
+                    <h4 className="text-[7px] sm:text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1 sm:mb-1.5">Top Strengths</h4>
                     <div className="flex flex-wrap gap-1">
-                      {job.analysis.strengths.slice(0, 3).map((s, i) => (
+                      {job.analysis.strengths.slice(0, 4).map((s, i) => (
                         <span key={i} className="text-[7px] sm:text-[8px] bg-white text-emerald-700 px-1 py-0.5 rounded font-bold border border-emerald-100">{s}</span>
                       ))}
                     </div>
                   </div>
                   <div className="bg-rose-50 border border-rose-100 p-2 sm:p-3 rounded-xl">
-                    <h4 className="text-[7px] sm:text-[8px] font-black text-rose-600 uppercase tracking-widest mb-1 sm:mb-1.5">Gap Items</h4>
+                    <h4 className="text-[7px] sm:text-[8px] font-black text-rose-600 uppercase tracking-widest mb-1 sm:mb-1.5">Focus Areas</h4>
                     <div className="flex flex-wrap gap-1">
-                      {job.analysis.gaps.slice(0, 3).map((s, i) => (
+                      {job.analysis.gaps.slice(0, 4).map((s, i) => (
                         <span key={i} className="text-[7px] sm:text-[8px] bg-white text-rose-700 px-1 py-0.5 rounded font-bold border border-rose-100">{s}</span>
                       ))}
                     </div>
@@ -185,7 +185,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
               <div className="bg-white p-4 sm:p-7 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-3 sm:mb-4 border-b border-slate-50 pb-3 sm:pb-4">
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest">Requirements</h3>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest">Description</h3>
                   <div className="text-[9px] sm:text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" /> {job.salaryRange}
                   </div>
@@ -202,7 +202,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                 <div className="space-y-6">
                   {/* Status Control */}
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2.5">Pipeline State</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2.5">Current Status</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.values(JobStatus).map(s => (
                         <button 
@@ -216,10 +216,10 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                     </div>
                   </div>
 
-                  {/* Interview Journey */}
+                  {/* Interview Timeline */}
                   <div className="pt-6 border-t border-slate-100">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Tracking History</h3>
+                      <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Interviews</h3>
                       <button onClick={handleAddInterview} className="bg-slate-900 text-white p-1.5 rounded-lg transition-transform active:scale-90 shadow-lg shadow-slate-200">
                         <Plus className="w-4 h-4" />
                       </button>
@@ -243,7 +243,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                               value={interview.stage} 
                               onChange={e => updateInterview(interview.id, { stage: e.target.value })}
                               className="bg-transparent border-none font-black text-slate-800 focus:ring-0 text-xs p-0 flex-1 outline-none"
-                              placeholder="Interview Stage"
+                              placeholder="Step name..."
                             />
                           </div>
 
@@ -272,7 +272,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                                <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm overflow-hidden">
                                  <LinkIcon className="w-3 h-3 text-indigo-600 shrink-0" />
                                  <input 
-                                    placeholder="Conference Link" 
+                                    placeholder="Meeting link..." 
                                     value={interview.link || ""} 
                                     onChange={e => updateInterview(interview.id, { link: e.target.value })}
                                     className="bg-transparent border-none text-[10px] font-black text-indigo-600 focus:ring-0 p-0 flex-1 truncate"
@@ -297,19 +297,19 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                             className={`w-full flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest px-2.5 py-2 rounded-lg transition-all ${interview.remindersSet ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}
                           >
                             {interview.remindersSet ? <Bell className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
-                            {interview.remindersSet ? 'Active Tasks' : 'Watch Milestones'}
+                            {interview.remindersSet ? 'Alerts On' : 'Set Alerts'}
                           </button>
 
                           <div className="space-y-4 pt-2">
                              <div>
                                <div className="flex items-center justify-between mb-2">
-                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Follow-ups & Prep</span>
+                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasks & Prep</span>
                                  <button onClick={() => setActiveTaskInput({ id: interview.id, type: 'post' })} className="text-indigo-600 p-0.5"><Plus className="w-3.5 h-3.5" /></button>
                                </div>
                                {activeTaskInput.id === interview.id && activeTaskInput.type === 'post' && (
                                  <div className="flex items-center gap-1 mb-2 animate-in slide-in-from-top-1">
                                    <input 
-                                     autoFocus placeholder="Prep task..."
+                                     autoFocus placeholder="New task..."
                                      className="text-[10px] bg-white border border-slate-200 rounded-lg p-2 flex-1 focus:outline-none shadow-sm"
                                      value={newTaskText[`${interview.id}-post`] || ''}
                                      onChange={e => setNewTaskText(prev => ({ ...prev, [`${interview.id}-post`]: e.target.value }))}
@@ -341,10 +341,10 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
         {/* Footer */}
         <div className="p-4 sm:p-6 border-t border-slate-100 bg-white flex items-center justify-between sticky bottom-0 z-20">
           <button onClick={() => onDelete(job.id)} className="text-rose-600 font-black text-[9px] sm:text-xs uppercase flex items-center gap-2 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all">
-            <Trash2 className="w-3.5 h-3.5" /> Remove Role
+            <Trash2 className="w-3.5 h-3.5" /> Delete Application
           </button>
           <div className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-widest text-right">
-            Local Sync: {new Date(job.dateModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            Updated: {new Date(job.dateModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </div>

@@ -11,7 +11,7 @@ interface ResumeLabProps {
 
 const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, onUpdateJob }) => {
   const [editing, setEditing] = useState(!resumeData.content);
-  const [tempText, setTempText] = useState(resumeData.content || '');
+  const [tempText, setTempText] = useState(resumeData.type === 'pdf' ? resumeData.extractedText || '' : resumeData.content || '');
   const [isUploading, setIsUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -49,9 +49,9 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   // Sync tempText with resumeData prop changes
   useEffect(() => {
     if (!resumeData.content || !editing) {
-      setTempText(resumeData.content || '');
+      setTempText(resumeData.type === 'pdf' ? resumeData.extractedText || '' : resumeData.content || '');
     }
-  }, [resumeData.content, editing]);
+  }, [resumeData.content, resumeData.type, resumeData.extractedText, editing]);
 
   const getPdfjs = () => {
     // @ts-ignore
@@ -147,9 +147,12 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       setEditing(true);
       setCurrentPage(1);
       setNumPages(0);
-      if (pdfDocRef.current) { 
-        pdfDocRef.current.destroy?.(); 
-        pdfDocRef.current = null; 
+      if (pdfDocRef.current) {
+        pdfDocRef.current.destroy?.();
+        pdfDocRef.current = null;
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     }
   };
@@ -221,7 +224,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                 {resumeData.type === 'pdf' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />} 
-                {resumeData.type === 'pdf' ? 'Visual Document' : 'Profile Profile'}
+                {resumeData.type === 'pdf' ? 'Visual Document' : 'Resume Profile'}
               </h3>
               <div className="flex items-center gap-2">
                 {resumeData.type === 'pdf' && numPages > 1 && (
@@ -245,7 +248,12 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                 )}
                 <div className="flex items-center gap-1">
                   {editing ? (
-                    <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Profile</button>
+                    <div className="flex items-center gap-1.5">
+                      {resumeData.content && (
+                        <button onClick={() => { setTempText(resumeData.type === 'pdf' ? resumeData.extractedText || '' : resumeData.content || ''); setEditing(false); }} className="text-slate-500 font-bold text-[10px] uppercase hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-all">Discard</button>
+                      )}
+                      <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Profile</button>
+                    </div>
                   ) : (
                     <button onClick={() => { setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Edit</button>
                   )}
@@ -263,6 +271,16 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             </div>
 
             <div ref={containerRef} className="flex-1 bg-slate-200 relative flex flex-col items-center overflow-y-auto max-h-[800px] scroll-smooth">
+              {editing && resumeData.type === 'pdf' && (
+                <div className="w-full px-6 pt-4">
+                  <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] font-semibold text-amber-700 leading-relaxed">
+                      Manual edits will convert your PDF to a text-only profile. For best results, update your PDF externally and re-upload it using the <span className="font-black">Update PDF</span> button above.
+                    </p>
+                  </div>
+                </div>
+              )}
               {editing ? (
                 <div className="w-full h-full p-6">
                   <textarea 

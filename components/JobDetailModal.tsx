@@ -493,7 +493,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
             </button>
           )}
           <div className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-widest text-right">
-            Updated: {new Date(job.dateModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            Updated: {new Date(job.dateModified).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(job.dateModified).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </div>

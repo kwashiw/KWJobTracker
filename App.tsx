@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, Briefcase, Search, Settings, Calendar, TrendingUp, 
   ChevronRight, LayoutDashboard, FileText, CheckCircle,
-  Sparkles, Award, Bell, X, AlertCircle
+  Sparkles, Award, Bell, X, Archive
 } from 'lucide-react';
 import { JobApplication, JobStatus, CareerStats, ResumeData } from './types';
 import { extractJobDetails } from './services/gemini';
@@ -13,8 +13,9 @@ import SettingsModal from './components/SettingsModal';
 import InterviewAgenda from './components/InterviewAgenda';
 import ResumeLab from './components/ResumeLab';
 import OfferComparisonModal from './components/OfferComparisonModal';
+import ArchiveView from './components/ArchiveView';
 
-type Tab = 'tracker' | 'interviews' | 'resume';
+type Tab = 'tracker' | 'interviews' | 'resume' | 'archive';
 
 const App: React.FC = () => {
   const [jobs, setJobs] = useState<JobApplication[]>([]);
@@ -28,7 +29,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const selectedJob = useMemo(() => jobs.find(j => j.id === selectedJobId) || null, [jobs, selectedJobId]);
-  const offers = useMemo(() => jobs.filter(j => j.status === JobStatus.OFFER), [jobs]);
+  const offers = useMemo(() => jobs.filter(j => j.status === JobStatus.OFFER && !j.isArchived), [jobs]);
 
   useEffect(() => {
     const savedJobs = localStorage.getItem('kw_track_jobs');
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const stats: CareerStats = useMemo(() => {
     const totalOffers = jobs.filter(j => j.status === JobStatus.OFFER).length;
     const totalRejections = jobs.filter(j => j.status === JobStatus.REJECTED).length;
+    // Total Applied reflects everything in the DB as requested
     return {
       totalApplied: jobs.length,
       totalRejections,
@@ -72,7 +74,7 @@ const App: React.FC = () => {
     const newJob: JobApplication = {
       id, title, company: "Analyzing...", description, salaryRange: "Analyzing...",
       status: JobStatus.APPLIED, dateAdded: now, dateModified: now, link: url,
-      interviews: []
+      interviews: [], isArchived: false
     };
     setJobs(prev => [newJob, ...prev]);
     setIsAddModalOpen(false);
@@ -89,13 +91,19 @@ const App: React.FC = () => {
   }, []);
 
   const handleDeleteJob = (id: string) => {
+    // Instead of deleting, we archive by default
+    updateJob(id, { isArchived: true });
     setSelectedJobId(null);
-    setTimeout(() => setJobs(prev => prev.filter(j => j.id !== id)), 0);
+  };
+
+  const handlePermanentDelete = (id: string) => {
+    setJobs(prev => prev.filter(j => j.id !== id));
+    setSelectedJobId(null);
   };
 
   const upcomingInterviews = useMemo(() => {
     return jobs
-      .filter(job => job.status !== JobStatus.REJECTED)
+      .filter(job => job.status !== JobStatus.REJECTED && !job.isArchived)
       .flatMap(job => job.interviews.map(i => ({ ...i, jobTitle: job.title, company: job.company, jobId: job.id })))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [jobs]);
@@ -105,7 +113,7 @@ const App: React.FC = () => {
   }, [upcomingInterviews]);
 
   const filteredJobs = useMemo(() => 
-    jobs.filter(j => j.status !== JobStatus.REJECTED && (
+    jobs.filter(j => !j.isArchived && j.status !== JobStatus.REJECTED && (
       j.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
       j.company.toLowerCase().includes(searchQuery.toLowerCase())
     ))
@@ -242,14 +250,13 @@ const App: React.FC = () => {
 
         {activeTab === 'interviews' && <InterviewAgenda interviews={upcomingInterviews} onSelectJob={setSelectedJobId} />}
         {activeTab === 'resume' && <ResumeLab resumeData={resumeData} jobs={jobs} onSaveResume={setResumeData} onUpdateJob={updateJob} />}
+        {activeTab === 'archive' && <ArchiveView jobs={jobs} onSelectJob={setSelectedJobId} onRestore={(id) => updateJob(id, { isArchived: false, status: JobStatus.APPLIED })} onDelete={handlePermanentDelete} />}
         
-        {/* Footnote inside scroll content for mobile - strictly non-fixed */}
         <div className="lg:hidden text-center mt-12 mb-6 text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] opacity-40 select-none">
           KNAW Labs
         </div>
       </main>
 
-      {/* Global Footnote - Fixed bottom-right for desktop ONLY */}
       <div className="hidden lg:block fixed bottom-6 right-6 text-[10px] font-black text-slate-400/60 uppercase tracking-widest z-[100] pointer-events-none select-none">
         KNAW Labs
       </div>
@@ -259,6 +266,7 @@ const App: React.FC = () => {
           <NavButton icon={<LayoutDashboard />} label="Funnel" active={activeTab === 'tracker'} onClick={() => setActiveTab('tracker')} />
           <NavButton icon={<Calendar />} label="Schedule" active={activeTab === 'interviews'} onClick={() => setActiveTab('interviews')} />
           <NavButton icon={<FileText />} label="Resume" active={activeTab === 'resume'} onClick={() => setActiveTab('resume')} />
+          <NavButton icon={<Archive />} label="Archive" active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} />
         </div>
       </nav>
 

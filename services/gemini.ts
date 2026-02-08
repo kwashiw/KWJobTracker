@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Satisfy TypeScript compiler for the environment variable injected by Vite/GitHub Actions
@@ -60,7 +61,7 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 5, delay = 2000)
       
     if (isRetryable && retries > 0) {
       const backoff = delay + Math.random() * 1000; // Add jitter
-      console.warn(`Transient error (${status}). Retrying in ${Math.round(backoff)}ms... (${retries} retries left)`);
+      console.warn(`Transient error (${status}). Retrying in ${Math.round(backoff)}ms... (${retries} left)`);
       await new Promise(resolve => setTimeout(resolve, backoff));
       return callWithRetry(fn, retries - 1, delay * 2);
     }
@@ -103,7 +104,8 @@ export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> =>
 
     const data = safeParseJson<ExtractedJobData>(response.text, { company: "Unknown", salaryRange: "Not found", description: "" });
     
-    const candidates = (response as any).candidates;
+    // Extract grounding URLs as required for search grounding tool usage
+    const candidates = response.candidates;
     const groundingMetadata = candidates?.[0]?.groundingMetadata;
     const chunks = groundingMetadata?.groundingChunks;
     

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Calendar, User, MapPin, ExternalLink, Clock, Briefcase, Bell } from 'lucide-react';
 
@@ -60,7 +61,8 @@ const InterviewAgenda: React.FC<InterviewAgendaProps> = ({ interviews, onSelectJ
   );
 };
 
-const AgendaCard = ({ item, onSelect }: { item: AgendaItem, onSelect: (id: string) => void }) => {
+// Use React.FC to properly handle standard React props like 'key' in JSX maps
+const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }> = ({ item, onSelect }) => {
   const dateObj = new Date(item.date);
   const isToday = dateObj.toDateString() === new Date().toDateString();
 

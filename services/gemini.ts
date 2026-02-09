@@ -11,10 +11,20 @@ declare var process: {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export interface ExtractedJobData {
+  title?: string;
   company: string;
   salaryRange: string;
   description?: string;
   sources?: { uri: string; title: string }[];
+}
+
+export type ImportMethod = 'cors_proxy' | 'google_search' | 'none';
+
+export interface MagicImportResult {
+  data: ExtractedJobData;
+  method: ImportMethod;
+  confidence: 'high' | 'low';
+  warning?: string;
 }
 
 export interface MatchAnalysisResult {
@@ -82,41 +92,182 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 5, delay = 2000)
   }
 }
 
-export const fetchJobFromUrl = async (url: string): Promise<ExtractedJobData> => {
+/**
+ * Detects LinkedIn URLs (which require auth and can't be proxied).
+ */
+function isLinkedInUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('linkedin.com');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches page content via a CORS proxy and strips HTML to plain text.
+ */
+async function fetchViaCorsProxy(url: string): Promise<string | null> {
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return null;
+    const html = await response.text();
+
+    // Strip HTML to plain text
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // If very little text returned, proxy likely failed silently
+    if (text.length < 100) return null;
+
+    // Truncate to stay within reasonable Gemini context limits
+    return text.slice(0, 30000);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts structured job data from raw page text using Gemini.
+ */
+async function extractFromPageContent(pageText: string, url: string): Promise<ExtractedJobData> {
+  return callWithRetry(async () => {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are extracting job posting details from a webpage's text content.
+The URL was: ${url}
+
+Extract the following fields. If a field is not found, use "Not found" for strings.
+
+PAGE CONTENT:
+${pageText}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: "The job title (e.g. 'Senior Software Engineer')" },
+            company: { type: Type.STRING, description: "The company name" },
+            salaryRange: { type: Type.STRING, description: "The salary or compensation range, if mentioned" },
+            description: { type: Type.STRING, description: "A detailed summary of the role's responsibilities, requirements, and qualifications (max 500 words)" }
+          },
+          required: ["title", "company", "salaryRange", "description"]
+        }
+      }
+    });
+    return safeParseJson<ExtractedJobData>(response.text, {
+      title: "Not found", company: "Unknown", salaryRange: "Not found", description: ""
+    });
+  });
+}
+
+/**
+ * Fallback: uses Google Search grounding to find job details when direct page access fails.
+ */
+const fetchJobFromUrlViaSearch = async (url: string): Promise<ExtractedJobData> => {
   return callWithRetry(async () => {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analyze this URL for job details including title, company name, salary range, and a summary: ${url}`,
+      contents: `Search Google for information about this job posting URL: ${url}
+
+Find and extract:
+- The exact job title
+- The company name
+- The salary/compensation range (if available)
+- A detailed summary of the job responsibilities and requirements
+
+If you cannot find specific information, respond with "Not found" for that field. Do not make up information.`,
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            company: { type: Type.STRING },
-            salaryRange: { type: Type.STRING },
-            description: { type: Type.STRING, description: "A summary of requirements." }
+            title: { type: Type.STRING, description: "The exact job title" },
+            company: { type: Type.STRING, description: "The company name" },
+            salaryRange: { type: Type.STRING, description: "Salary or compensation range" },
+            description: { type: Type.STRING, description: "Detailed summary of responsibilities and requirements" }
           },
-          required: ["company", "salaryRange", "description"]
+          required: ["title", "company", "salaryRange", "description"]
         }
       }
     });
 
-    const data = safeParseJson<ExtractedJobData>(response.text, { company: "Unknown", salaryRange: "Not found", description: "" });
-    
+    const data = safeParseJson<ExtractedJobData>(response.text, {
+      title: "Not found", company: "Unknown", salaryRange: "Not found", description: ""
+    });
+
     // Extract grounding URLs as required for search grounding tool usage
     const candidates = response.candidates;
     const groundingMetadata = candidates?.[0]?.groundingMetadata;
     const chunks = groundingMetadata?.groundingChunks;
-    
+
     if (chunks && Array.isArray(chunks)) {
       data.sources = chunks
         .filter((c: any) => c.web)
         .map((c: any) => ({ uri: c.web.uri, title: c.web.title }));
     }
-    
+
     return data;
   });
+};
+
+/**
+ * Magic Import: two-strategy pipeline for extracting job details from a URL.
+ * 1. Try CORS proxy to fetch actual page content (skipped for LinkedIn)
+ * 2. Fall back to Google Search grounding
+ */
+export const magicImport = async (url: string): Promise<MagicImportResult> => {
+  const linkedIn = isLinkedInUrl(url);
+
+  // Strategy 1: CORS proxy (skip for LinkedIn — it requires auth)
+  if (!linkedIn) {
+    const pageText = await fetchViaCorsProxy(url);
+    if (pageText) {
+      try {
+        const data = await extractFromPageContent(pageText, url);
+        return { data, method: 'cors_proxy', confidence: 'high' };
+      } catch (err) {
+        console.warn("CORS proxy fetch succeeded but Gemini extraction failed, falling through to search grounding", err);
+      }
+    }
+  }
+
+  // Strategy 2: Google Search grounding
+  try {
+    const data = await fetchJobFromUrlViaSearch(url);
+    const hasUsefulData = data.company !== "Unknown" && data.description && data.description.length > 20;
+    return {
+      data,
+      method: 'google_search',
+      confidence: 'low',
+      warning: linkedIn
+        ? "LinkedIn jobs require authentication. The AI searched Google for public info about this posting, but results may be incomplete. Consider pasting the description directly."
+        : hasUsefulData
+          ? "Could not access the page directly. Details were found via Google Search and may be incomplete."
+          : "Could not access this page or find it via Google Search. Please paste the job description manually."
+    };
+  } catch (err) {
+    return {
+      data: { title: undefined, company: "Unknown", salaryRange: "Not found", description: "" },
+      method: 'none',
+      confidence: 'low',
+      warning: linkedIn
+        ? "LinkedIn jobs are behind a login wall and cannot be imported automatically. Please copy and paste the job description."
+        : "Could not fetch details from this URL. Please paste the job description manually."
+    };
+  }
 };
 
 export const extractJobDetails = async (description: string): Promise<ExtractedJobData> => {

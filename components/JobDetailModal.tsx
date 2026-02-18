@@ -339,7 +339,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                 <textarea
                   value={job.notes || ''}
                   onChange={e => onUpdateJob({ notes: e.target.value })}
-                  rows={10}
+                  rows={25}
                   placeholder="Add interview prep notes, questions to ask, follow-up items..."
                   className="w-full text-[11px] sm:text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-amber-500/20 outline-none resize-none"
                 />

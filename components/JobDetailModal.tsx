@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, Trash2, ExternalLink, Calendar, Briefcase, TrendingUp, Clock, 
+import {
+  X, Trash2, ExternalLink, Calendar, Briefcase, TrendingUp, Clock,
   Plus, CheckCircle2, Circle, Link as LinkIcon, User, MapPin, Sparkles, Loader2,
-  Bell, BellOff, Send, Globe, AlertTriangle, Edit2, Save, RotateCcw, RefreshCw, Archive
+  Bell, BellOff, Send, Globe, AlertTriangle, Edit2, Save, RotateCcw, RefreshCw, Archive, StickyNote
 } from 'lucide-react';
 import { JobApplication, JobStatus, Interview, TodoItem } from '../types';
 import { analyzeJobMatch } from '../services/gemini';
@@ -327,6 +327,22 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                     {job.description}
                   </div>
                 )}
+              </div>
+
+              {/* Notes Section */}
+              <div className="bg-white p-4 sm:p-7 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 border-b border-slate-50 pb-3 sm:pb-4">
+                  <StickyNote className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest">Notes</h3>
+                  <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest ml-auto">Auto-saved</span>
+                </div>
+                <textarea
+                  value={job.notes || ''}
+                  onChange={e => onUpdateJob({ notes: e.target.value })}
+                  rows={5}
+                  placeholder="Add interview prep notes, questions to ask, follow-up items..."
+                  className="w-full text-[11px] sm:text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-amber-500/20 outline-none resize-none"
+                />
               </div>
             </div>
 

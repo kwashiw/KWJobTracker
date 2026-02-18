@@ -57,6 +57,7 @@ export interface JobApplication {
   interviews: Interview[];
   analysis?: MatchAnalysis;
   isArchived?: boolean;
+  notes?: string;
 }
 
 export interface CareerStats {

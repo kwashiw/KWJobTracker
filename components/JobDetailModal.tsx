@@ -21,41 +21,23 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
   const [error, setError] = useState<string | null>(null);
   const [newTaskText, setNewTaskText] = useState<{ [key: string]: string }>({});
   const [activeTaskInput, setActiveTaskInput] = useState<{ id: string, type: 'pre' | 'post' | null }>({ id: '', type: null });
-  
-  // Edit Mode States
-  const [isEditing, setIsEditing] = useState(false);
-  const [editFields, setEditFields] = useState({
-    title: '',
-    company: '',
-    salaryRange: '',
-    description: ''
-  });
+  const [editingTodo, setEditingTodo] = useState<{ interviewId: string; todoId: string; type: 'pre' | 'post'; text: string } | null>(null);
 
-  // Sync edit fields when entering edit mode or when job changes
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFields, setEditFields] = useState({ title: '', company: '', salaryRange: '', description: '', link: '' });
+
   useEffect(() => {
     if (job) {
-      setEditFields({
-        title: job.title,
-        company: job.company,
-        salaryRange: job.salaryRange,
-        description: job.description
-      });
+      setEditFields({ title: job.title, company: job.company, salaryRange: job.salaryRange, description: job.description, link: job.link || '' });
     }
   }, [job, isEditing]);
 
   if (!job) return null;
 
-  const handleStatusChange = (status: JobStatus) => {
-    onUpdateJob({ status });
-  };
+  const handleStatusChange = (status: JobStatus) => onUpdateJob({ status });
 
   const handleSaveChanges = () => {
-    onUpdateJob({
-      title: editFields.title,
-      company: editFields.company,
-      salaryRange: editFields.salaryRange,
-      description: editFields.description
-    });
+    onUpdateJob({ title: editFields.title, company: editFields.company, salaryRange: editFields.salaryRange, description: editFields.description, link: editFields.link.trim() || undefined });
     setIsEditing(false);
   };
 
@@ -66,40 +48,28 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
   const handleAddInterview = () => {
     const newInterview: Interview = {
-      id: crypto.randomUUID(),
-      stage: "New Step",
-      interviewer: "",
-      date: new Date().toISOString().slice(0, 16),
-      mode: 'Remote',
-      preTodos: [],
-      postTodos: [],
-      remindersSet: false
+      id: crypto.randomUUID(), stage: "New Step", interviewer: "",
+      date: new Date().toISOString().slice(0, 16), mode: 'Remote',
+      preTodos: [], postTodos: [], remindersSet: false
     };
     onUpdateJob({ interviews: [...job.interviews, newInterview], status: JobStatus.INTERVIEWING });
   };
 
   const updateInterview = (id: string, updates: Partial<Interview>) => {
-    onUpdateJob({
-      interviews: job.interviews.map(i => i.id === id ? { ...i, ...updates } : i)
-    });
+    onUpdateJob({ interviews: job.interviews.map(i => i.id === id ? { ...i, ...updates } : i) });
   };
 
   const deleteInterview = (id: string) => {
-    onUpdateJob({
-      interviews: job.interviews.filter(i => i.id !== id)
-    });
+    onUpdateJob({ interviews: job.interviews.filter(i => i.id !== id) });
   };
 
   const handleAddTask = (interviewId: string, type: 'pre' | 'post') => {
     const text = newTaskText[`${interviewId}-${type}`];
     if (!text?.trim()) return;
-
     const interview = job.interviews.find(i => i.id === interviewId);
     if (!interview) return;
-
     const newItem = { id: crypto.randomUUID(), text: text.trim(), completed: false };
     const list = type === 'pre' ? interview.preTodos : interview.postTodos;
-    
     updateInterview(interviewId, type === 'pre' ? { preTodos: [...list, newItem] } : { postTodos: [...list, newItem] });
     setNewTaskText(prev => ({ ...prev, [`${interviewId}-${type}`]: '' }));
     setActiveTaskInput({ id: '', type: null });
@@ -108,18 +78,25 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
   const toggleTodo = (interviewId: string, todoId: string, type: 'pre' | 'post') => {
     const interview = job.interviews.find(i => i.id === interviewId);
     if (!interview) return;
-
     const list = type === 'pre' ? interview.preTodos : interview.postTodos;
     const newList = list.map(t => t.id === todoId ? { ...t, completed: !t.completed } : t);
-    
     updateInterview(interviewId, type === 'pre' ? { preTodos: newList } : { postTodos: newList });
   };
 
+  const saveTodoEdit = () => {
+    if (!editingTodo) return;
+    const { interviewId, todoId, type, text } = editingTodo;
+    if (!text.trim()) { setEditingTodo(null); return; }
+    const interview = job.interviews.find(i => i.id === interviewId);
+    if (!interview) return;
+    const list = type === 'pre' ? interview.preTodos : interview.postTodos;
+    const newList = list.map(t => t.id === todoId ? { ...t, text: text.trim() } : t);
+    updateInterview(interviewId, type === 'pre' ? { preTodos: newList } : { postTodos: newList });
+    setEditingTodo(null);
+  };
+
   const runAnalysis = async () => {
-    if (!resume) {
-      alert("Please upload your resume in 'Resume Lab' first!");
-      return;
-    }
+    if (!resume) { alert("Please upload your resume in 'Resume Lab' first!"); return; }
     setIsAnalyzing(true);
     setError(null);
     try {
@@ -129,12 +106,10 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
       }
       onUpdateJob({ analysis: result });
     } catch (err: any) {
-      console.error(err);
       const msg = err?.message || "";
       const status = err?.status || err?.code;
-      
       if (msg.toLowerCase().includes('overloaded') || status === 503) {
-        setError("AI Engine Overloaded: Google's servers are currently at capacity. We tried retrying, but they're still busy. Please try again in a few minutes.");
+        setError("AI Engine Overloaded: Google's servers are currently at capacity. Please try again in a few minutes.");
       } else if (msg.toLowerCase().includes('429') || status === 429) {
         setError("Rate Limit Reached: Too many requests at once. Please wait about 60 seconds before retrying.");
       } else if (msg.toLowerCase().includes('blocked') || msg.toLowerCase().includes('safety')) {
@@ -150,38 +125,53 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-        
+      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
+
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex items-start justify-between bg-white z-20">
           <div className="flex-1 min-w-0 pr-4">
             {isEditing ? (
               <div className="space-y-2 max-w-xl">
-                <input 
+                <input
                   value={editFields.title}
                   onChange={e => setEditFields({ ...editFields, title: e.target.value })}
                   placeholder="Job Title"
-                  className="w-full text-lg sm:text-2xl font-black text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full text-lg sm:text-2xl font-black text-slate-900 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': 'rgba(200,147,58,0.2)' } as any}
                 />
                 <div className="flex items-center gap-2">
-                  <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
-                  <input 
+                  <Briefcase className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
+                  <input
                     value={editFields.company}
                     onChange={e => setEditFields({ ...editFields, company: e.target.value })}
                     placeholder="Company Name"
-                    className="flex-1 text-[10px] sm:text-xs font-black text-indigo-600 uppercase tracking-widest bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="flex-1 text-[10px] sm:text-xs font-black uppercase tracking-widest bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 outline-none focus:ring-2"
+                    style={{ color: 'var(--gold)', '--tw-ring-color': 'rgba(200,147,58,0.2)' } as any}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--gold)' }} />
+                  <input
+                    value={editFields.link}
+                    onChange={e => setEditFields({ ...editFields, link: e.target.value })}
+                    placeholder="Job posting URL (optional)"
+                    className="flex-1 text-[10px] sm:text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 outline-none focus:ring-2 text-slate-600"
+                    style={{ '--tw-ring-color': 'rgba(200,147,58,0.2)' } as any}
                   />
                 </div>
               </div>
             ) : (
               <>
-                <h2 className="text-lg sm:text-2xl font-black text-slate-900 truncate">{job.title}</h2>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-900 truncate">{job.title}</h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-slate-500 font-bold uppercase tracking-wider text-[9px] sm:text-xs mt-1">
-                  <span className="flex items-center gap-1 shrink-0 truncate max-w-[120px] sm:max-w-none font-black text-indigo-600/80"><Briefcase className="w-3.5 h-3.5" /> {job.company}</span>
+                  <span className="flex items-center gap-1 shrink-0 truncate max-w-[120px] sm:max-w-none font-black" style={{ color: 'var(--gold)' }}>
+                    <Briefcase className="w-3.5 h-3.5" /> {job.company}
+                  </span>
                   {job.link && (
-                    <a 
-                      href={job.link} target="_blank" rel="noreferrer" 
-                      className="text-indigo-600 hover:underline flex items-center gap-1 shrink-0 px-2 py-0.5 bg-indigo-50 rounded"
+                    <a
+                      href={job.link} target="_blank" rel="noreferrer"
+                      className="hover:underline flex items-center gap-1 shrink-0 px-2 py-0.5 rounded"
+                      style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}
                       onClick={e => e.stopPropagation()}
                     >
                       <ExternalLink className="w-3 h-3" /> Job Link
@@ -196,31 +186,26 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
               </>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2 shrink-0">
             {isEditing ? (
               <>
-                <button 
-                  onClick={() => setIsEditing(false)} 
-                  className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
-                  title="Cancel Changes"
-                >
+                <button onClick={() => setIsEditing(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors" title="Cancel Changes">
                   <RotateCcw className="w-5 h-5" />
                 </button>
-                <button 
-                  onClick={handleSaveChanges} 
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                <button
+                  onClick={handleSaveChanges}
+                  className="flex items-center gap-2 text-white px-4 py-2 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all"
+                  style={{ background: 'var(--gold)', boxShadow: '0 4px 12px rgba(200,147,58,0.25)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold)')}
                 >
                   <Save className="w-4 h-4" /> Save
                 </button>
               </>
             ) : (
               !job.isArchived && (
-                <button 
-                  onClick={() => setIsEditing(true)} 
-                  className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
-                  title="Edit Details"
-                >
+                <button onClick={() => setIsEditing(true)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors" title="Edit Details">
                   <Edit2 className="w-5 h-5" />
                 </button>
               )
@@ -233,40 +218,39 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
         <div className="overflow-y-auto flex-1 bg-slate-50/50">
           <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-            
-            {/* Main Content Area */}
+
+            {/* Main Content */}
             <div className="lg:col-span-8 space-y-6">
-              
-              {/* AI Match Display */}
+
+              {/* AI Match Bar */}
               {!isEditing && !job.isArchived && (
                 <div className="bg-slate-900 rounded-2xl p-3 sm:p-5 text-white flex items-center justify-between gap-4 shadow-xl border border-slate-800">
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${job.analysis ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                    <div className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl`} style={{ background: job.analysis ? 'var(--gold)' : '#1e293b' }}>
                       <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     </div>
                     <div>
                       <h3 className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400">AI Compatibility Score</h3>
                       <div className="flex items-center gap-2">
-                         <p className="text-xs sm:text-sm font-black">{job.analysis ? `${job.analysis.score}% Fit` : 'Ready to Analyze'}</p>
-                         <button 
-                          onClick={runAnalysis} 
-                          disabled={isAnalyzing} 
-                          className="text-[8px] sm:text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
+                        <p className="text-xs sm:text-sm font-black">{job.analysis ? `${job.analysis.score}% Fit` : 'Ready to Analyze'}</p>
+                        <button
+                          onClick={runAnalysis}
+                          disabled={isAnalyzing}
+                          className="text-[8px] sm:text-[9px] font-black uppercase disabled:opacity-50 transition-colors"
+                          style={{ color: 'var(--gold)' }}
                         >
                           {isAnalyzing ? 'Thinking Deeply...' : (job.analysis ? 'Re-Analyze' : 'Run Fit Check')}
-                         </button>
+                        </button>
                       </div>
                     </div>
                   </div>
-                  {isAnalyzing && <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-indigo-500" />}
+                  {isAnalyzing && <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" style={{ color: 'var(--gold)' }} />}
                 </div>
               )}
 
               {error && !isEditing && (
                 <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700 animate-in slide-in-from-top-2">
-                  <div className="p-2 bg-rose-100 rounded-lg shrink-0">
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
+                  <div className="p-2 bg-rose-100 rounded-lg shrink-0"><AlertTriangle className="w-4 h-4" /></div>
                   <div>
                     <p className="text-xs font-black uppercase tracking-wider mb-0.5">Engine Hiccup</p>
                     <p className="text-[11px] font-bold leading-tight opacity-80">{error}</p>
@@ -295,31 +279,34 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                 </div>
               )}
 
+              {/* Description */}
               <div className="bg-white p-4 sm:p-7 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between mb-3 sm:mb-4 border-b border-slate-50 pb-3 sm:pb-4">
                   <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest">Description</h3>
                   {isEditing ? (
-                    <div className="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded-lg">
-                      <TrendingUp className="w-3 h-3 text-indigo-600" />
-                      <input 
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{ background: 'var(--gold-dim)' }}>
+                      <TrendingUp className="w-3 h-3" style={{ color: 'var(--gold)' }} />
+                      <input
                         value={editFields.salaryRange}
                         onChange={e => setEditFields({ ...editFields, salaryRange: e.target.value })}
                         placeholder="Salary Range"
-                        className="text-[9px] sm:text-[10px] font-black text-indigo-600 bg-transparent border-none p-0 focus:ring-0 outline-none w-24"
+                        className="text-[9px] sm:text-[10px] font-black bg-transparent border-none p-0 focus:ring-0 outline-none w-24"
+                        style={{ color: 'var(--gold)' }}
                       />
                     </div>
                   ) : (
-                    <div className="text-[9px] sm:text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1">
+                    <div className="text-[9px] sm:text-[10px] font-black px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1" style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}>
                       <TrendingUp className="w-3 h-3" /> {job.salaryRange}
                     </div>
                   )}
                 </div>
                 {isEditing ? (
-                  <textarea 
+                  <textarea
                     value={editFields.description}
                     onChange={e => setEditFields({ ...editFields, description: e.target.value })}
                     rows={12}
-                    className="w-full text-[11px] sm:text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
+                    className="w-full text-[11px] sm:text-sm text-slate-600 leading-relaxed font-medium bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 outline-none resize-none"
+                    style={{ '--tw-ring-color': 'rgba(200,147,58,0.2)' } as any}
                     placeholder="Paste the full job description here..."
                   />
                 ) : (
@@ -329,7 +316,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                 )}
               </div>
 
-              {/* Notes Section */}
+              {/* Notes */}
               <div className="bg-white p-4 sm:p-7 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 border-b border-slate-50 pb-3 sm:pb-4">
                   <StickyNote className="w-4 h-4 text-amber-500" />
@@ -346,19 +333,23 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
               </div>
             </div>
 
-            {/* Sidebar Area */}
+            {/* Sidebar */}
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm lg:sticky lg:top-6">
                 <div className="space-y-6">
-                  {/* Status Control */}
+
+                  {/* Status */}
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2.5">Current Status</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.values(JobStatus).map(s => (
-                        <button 
-                          key={s} 
-                          onClick={() => handleStatusChange(s)} 
-                          className={`px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all ${job.status === s ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-100'}`}
+                        <button
+                          key={s}
+                          onClick={() => handleStatusChange(s)}
+                          className={`px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all ${job.status === s ? 'text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}
+                          style={job.status === s ? { background: 'var(--gold)', borderColor: 'var(--gold)' } : {}}
+                          onMouseEnter={e => job.status !== s && (e.currentTarget.style.borderColor = 'var(--gold-border)')}
+                          onMouseLeave={e => job.status !== s && (e.currentTarget.style.borderColor = '')}
                         >
                           {s}
                         </button>
@@ -366,7 +357,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                     </div>
                   </div>
 
-                  {/* Interview Timeline */}
+                  {/* Interviews */}
                   <div className="pt-6 border-t border-slate-100">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Interviews</h3>
@@ -381,21 +372,18 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                       {job.interviews.map((interview, idx) => (
                         <div key={interview.id} className="bg-slate-50 rounded-xl p-4 space-y-4 border border-slate-100 relative shadow-sm">
                           {!job.isArchived && (
-                            <button 
-                              onClick={() => deleteInterview(interview.id)} 
-                              className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors"
-                            >
+                            <button onClick={() => deleteInterview(interview.id)} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          
+
                           <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-white text-indigo-600 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm border border-slate-100">
+                            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center font-black text-[9px] shadow-sm border border-slate-100" style={{ color: 'var(--gold)' }}>
                               {idx + 1}
                             </div>
-                            <input 
+                            <input
                               disabled={job.isArchived}
-                              value={interview.stage} 
+                              value={interview.stage}
                               onChange={e => updateInterview(interview.id, { stage: e.target.value })}
                               className="bg-transparent border-none font-black text-slate-800 focus:ring-0 text-xs p-0 flex-1 outline-none disabled:opacity-70"
                               placeholder="Step name..."
@@ -403,89 +391,130 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                           </div>
 
                           <div className="space-y-2.5">
-                             <div className="flex items-center gap-2 text-slate-500">
-                               <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                               <input 
+                            <div className="flex items-center gap-2 text-slate-500">
+                              <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--gold)' }} />
+                              <input
+                                disabled={job.isArchived}
+                                type="datetime-local"
+                                value={interview.date}
+                                onChange={e => updateInterview(interview.id, { date: e.target.value })}
+                                className="bg-transparent border-none text-[10px] font-bold focus:ring-0 p-0 w-full disabled:opacity-70"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-500">
+                              <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--gold)' }} />
+                              <select
+                                disabled={job.isArchived}
+                                value={interview.mode}
+                                onChange={e => updateInterview(interview.id, { mode: e.target.value as any })}
+                                className="bg-transparent border-none text-[10px] font-bold focus:ring-0 p-0 w-full cursor-pointer disabled:opacity-70"
+                              >
+                                <option value="Remote">Remote</option>
+                                <option value="In-Person">In-Person</option>
+                              </select>
+                            </div>
+                            {interview.mode === 'Remote' && (
+                              <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm overflow-hidden">
+                                <LinkIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--gold)' }} />
+                                <input
                                   disabled={job.isArchived}
-                                  type="datetime-local" 
-                                  value={interview.date} 
-                                  onChange={e => updateInterview(interview.id, { date: e.target.value })}
-                                  className="bg-transparent border-none text-[10px] font-bold focus:ring-0 p-0 w-full disabled:opacity-70"
+                                  placeholder="Meeting link..."
+                                  value={interview.link || ""}
+                                  onChange={e => updateInterview(interview.id, { link: e.target.value })}
+                                  className="bg-transparent border-none text-[10px] font-black focus:ring-0 p-0 flex-1 truncate disabled:opacity-70"
+                                  style={{ color: 'var(--gold)' }}
                                 />
-                             </div>
-                             <div className="flex items-center gap-2 text-slate-500">
-                               <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                               <select 
-                                 disabled={job.isArchived}
-                                 value={interview.mode}
-                                 onChange={e => updateInterview(interview.id, { mode: e.target.value as any })}
-                                 className="bg-transparent border-none text-[10px] font-bold focus:ring-0 p-0 w-full cursor-pointer disabled:opacity-70"
-                               >
-                                 <option value="Remote">Remote</option>
-                                 <option value="In-Person">In-Person</option>
-                               </select>
-                             </div>
-                             {interview.mode === 'Remote' && (
-                               <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm overflow-hidden">
-                                 <LinkIcon className="w-3 h-3 text-indigo-600 shrink-0" />
-                                 <input 
-                                    disabled={job.isArchived}
-                                    placeholder="Meeting link..." 
-                                    value={interview.link || ""} 
-                                    onChange={e => updateInterview(interview.id, { link: e.target.value })}
-                                    className="bg-transparent border-none text-[10px] font-black text-indigo-600 focus:ring-0 p-0 flex-1 truncate disabled:opacity-70"
-                                  />
-                                  {interview.link && (
-                                    <a 
-                                      href={interview.link} 
-                                      target="_blank" 
-                                      rel="noreferrer" 
-                                      className="text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 shrink-0"
-                                      onClick={e => e.stopPropagation()}
-                                    >
-                                      Join
-                                    </a>
-                                  )}
-                               </div>
-                             )}
+                                {interview.link && (
+                                  <a
+                                    href={interview.link} target="_blank" rel="noreferrer"
+                                    className="text-[8px] font-black uppercase px-2 py-1 rounded shrink-0"
+                                    style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-mid)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold-dim)')}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    Join
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
 
-                          <button 
+                          <button
                             disabled={job.isArchived}
                             onClick={() => updateInterview(interview.id, { remindersSet: !interview.remindersSet })}
-                            className={`w-full flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest px-2.5 py-2 rounded-lg transition-all ${interview.remindersSet ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'} disabled:opacity-50`}
+                            className={`w-full flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest px-2.5 py-2 rounded-lg transition-all disabled:opacity-50 ${interview.remindersSet ? 'text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
+                            style={interview.remindersSet ? { background: 'var(--gold)' } : {}}
                           >
                             {interview.remindersSet ? <Bell className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
                             {interview.remindersSet ? 'Alerts On' : 'Set Alerts'}
                           </button>
 
                           <div className="space-y-4 pt-2">
-                             <div>
-                               <div className="flex items-center justify-between mb-2">
-                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasks & Prep</span>
-                                 {!job.isArchived && <button onClick={() => setActiveTaskInput({ id: interview.id, type: 'post' })} className="text-indigo-600 p-0.5"><Plus className="w-3.5 h-3.5" /></button>}
-                               </div>
-                               {activeTaskInput.id === interview.id && activeTaskInput.type === 'post' && (
-                                 <div className="flex items-center gap-1 mb-2 animate-in slide-in-from-top-1">
-                                   <input 
-                                     autoFocus placeholder="New task..."
-                                     className="text-[10px] bg-white border border-slate-200 rounded-lg p-2 flex-1 focus:outline-none shadow-sm"
-                                     value={newTaskText[`${interview.id}-post`] || ''}
-                                     onChange={e => setNewTaskText(prev => ({ ...prev, [`${interview.id}-post`]: e.target.value }))}
-                                     onKeyDown={e => e.key === 'Enter' && handleAddTask(interview.id, 'post')}
-                                   />
-                                   <button onClick={() => handleAddTask(interview.id, 'post')} className="bg-slate-900 text-white p-2 rounded-lg shadow-sm"><Send className="w-3 h-3" /></button>
-                                 </div>
-                               )}
-                               <div className="space-y-2">
-                                 {interview.postTodos.map(todo => (
-                                   <div key={todo.id} onClick={() => !job.isArchived && toggleTodo(interview.id, todo.id, 'post')} className={`flex items-start gap-2 ${job.isArchived ? '' : 'cursor-pointer group/todo'}`}>
-                                     {todo.completed ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" /> : <Circle className={`w-3.5 h-3.5 ${job.isArchived ? 'text-slate-200' : 'text-slate-300 group-hover/todo:text-indigo-400'} shrink-0 mt-0.5 transition-colors`} />}
-                                     <span className={`text-[10px] leading-tight flex-1 ${todo.completed ? 'text-slate-400 line-through font-medium' : 'text-slate-700 font-bold'}`}>{todo.text}</span>
-                                   </div>
-                                 ))}
-                               </div>
-                             </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasks & Prep</span>
+                                {!job.isArchived && (
+                                  <button onClick={() => setActiveTaskInput({ id: interview.id, type: 'post' })} className="p-0.5" style={{ color: 'var(--gold)' }}>
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              {activeTaskInput.id === interview.id && activeTaskInput.type === 'post' && (
+                                <div className="flex items-center gap-1 mb-2 animate-in slide-in-from-top-1">
+                                  <input
+                                    autoFocus placeholder="New task..."
+                                    className="text-[10px] bg-white border border-slate-200 rounded-lg p-2 flex-1 focus:outline-none shadow-sm"
+                                    value={newTaskText[`${interview.id}-post`] || ''}
+                                    onChange={e => setNewTaskText(prev => ({ ...prev, [`${interview.id}-post`]: e.target.value }))}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddTask(interview.id, 'post')}
+                                  />
+                                  <button onClick={() => handleAddTask(interview.id, 'post')} className="bg-slate-900 text-white p-2 rounded-lg shadow-sm">
+                                    <Send className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                              <div className="space-y-2">
+                                {interview.postTodos.map(todo => {
+                                  const isEditingThis = editingTodo?.todoId === todo.id && editingTodo?.interviewId === interview.id;
+                                  return (
+                                    <div key={todo.id} className="flex items-start gap-2 group/todo">
+                                      <button
+                                        disabled={job.isArchived}
+                                        onClick={() => toggleTodo(interview.id, todo.id, 'post')}
+                                        className="shrink-0 mt-0.5 disabled:opacity-50"
+                                      >
+                                        {todo.completed
+                                          ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                          : <Circle className="w-3.5 h-3.5 text-slate-300 hover:text-[#C8933A] transition-colors" />
+                                        }
+                                      </button>
+                                      {isEditingThis ? (
+                                        <input
+                                          autoFocus
+                                          value={editingTodo.text}
+                                          onChange={e => setEditingTodo({ ...editingTodo, text: e.target.value })}
+                                          onBlur={saveTodoEdit}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter') saveTodoEdit();
+                                            if (e.key === 'Escape') setEditingTodo(null);
+                                          }}
+                                          className="text-[10px] leading-tight flex-1 font-bold text-slate-700 bg-amber-50 border border-[rgba(200,147,58,0.4)] rounded px-1.5 py-0.5 outline-none focus:border-[#C8933A]"
+                                        />
+                                      ) : (
+                                        <span
+                                          onDoubleClick={() => !job.isArchived && setEditingTodo({ interviewId: interview.id, todoId: todo.id, type: 'post', text: todo.text })}
+                                          title={job.isArchived ? '' : 'Double-click to edit'}
+                                          className={`text-[10px] leading-tight flex-1 ${todo.completed ? 'text-slate-400 line-through font-medium' : 'text-slate-700 font-bold'} ${!job.isArchived ? 'cursor-text' : ''}`}
+                                        >
+                                          {todo.text}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ))}

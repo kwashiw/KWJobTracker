@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-  Plus, Briefcase, Search, Settings, Calendar, TrendingUp, 
+import {
+  Plus, Briefcase, Search, Settings, Calendar, TrendingUp,
   ChevronRight, LayoutDashboard, FileText, CheckCircle,
   Sparkles, Award, Bell, X, Archive
 } from 'lucide-react';
@@ -59,7 +59,6 @@ const App: React.FC = () => {
   const stats: CareerStats = useMemo(() => {
     const totalOffers = jobs.filter(j => j.status === JobStatus.OFFER).length;
     const totalRejections = jobs.filter(j => j.status === JobStatus.REJECTED).length;
-    // Total Applied reflects everything in the DB as requested
     return {
       totalApplied: jobs.length,
       totalRejections,
@@ -91,7 +90,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleDeleteJob = (id: string) => {
-    // Instead of deleting, we archive by default
     updateJob(id, { isArchived: true });
     setSelectedJobId(null);
   };
@@ -112,9 +110,9 @@ const App: React.FC = () => {
     return upcomingInterviews.filter(i => i.remindersSet && i.postTodos.some(t => !t.completed));
   }, [upcomingInterviews]);
 
-  const filteredJobs = useMemo(() => 
+  const filteredJobs = useMemo(() =>
     jobs.filter(j => !j.isArchived && j.status !== JobStatus.REJECTED && (
-      j.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      j.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       j.company.toLowerCase().includes(searchQuery.toLowerCase())
     ))
   , [jobs, searchQuery]);
@@ -124,15 +122,15 @@ const App: React.FC = () => {
       <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-xl shrink-0">
+            <div className="p-2 rounded-xl shrink-0" style={{ background: 'var(--gold)' }}>
               <Briefcase className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-lg font-black tracking-tighter truncate">KWJobTracker</h1>
+            <h1 className="font-display text-xl font-bold tracking-tight truncate">KWJobTracker</h1>
           </div>
-          
+
           <div className="flex items-center gap-1 sm:gap-2">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => pendingActions.length > 0 && setShowPending(!showPending)}
                 className={`p-2 rounded-full transition-all relative ${pendingActions.length > 0 ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300'}`}
               >
@@ -143,7 +141,7 @@ const App: React.FC = () => {
                   </span>
                 )}
               </button>
-              
+
               {showPending && pendingActions.length > 0 && (
                 <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 z-[60]">
                   <div className="flex items-center justify-between mb-3">
@@ -152,8 +150,8 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                     {pendingActions.map(action => (
-                      <div key={action.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors" onClick={() => { setSelectedJobId(action.jobId); setShowPending(false); }}>
-                        <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{action.company}</p>
+                      <div key={action.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer transition-colors hover:border-[rgba(200,147,58,0.3)]" onClick={() => { setSelectedJobId(action.jobId); setShowPending(false); }}>
+                        <p className="text-[10px] font-black uppercase mb-1" style={{ color: 'var(--gold)' }}>{action.company}</p>
                         <p className="text-xs font-bold text-slate-700 leading-tight mb-2">{action.stage} Follow-up</p>
                         <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold uppercase">
                           <Calendar className="w-3 h-3" /> Due Soon
@@ -164,7 +162,7 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
               <Settings className="w-5 h-5" />
             </button>
@@ -174,15 +172,18 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 mb-24 lg:mb-16 relative">
         {activeTab === 'tracker' && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-8 kw-slide-up">
             <StatsSection stats={stats} />
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">Active Funnel</h2>
+                <h2 className="font-display text-2xl font-bold text-slate-800">Active Funnel</h2>
                 {offers.length > 1 && (
-                  <button 
+                  <button
                     onClick={() => setIsCompareOpen(true)}
-                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                    className="flex items-center gap-1.5 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all shadow-lg"
+                    style={{ background: 'var(--gold)', boxShadow: '0 4px 12px rgba(200,147,58,0.25)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold)')}
                   >
                     <Award className="w-3 h-3" /> Compete Offers
                   </button>
@@ -190,37 +191,45 @@ const App: React.FC = () => {
               </div>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" placeholder="Filter apps..." 
-                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                <input
+                  type="text" placeholder="Filter apps..."
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 outline-none"
+                  style={{ '--tw-ring-color': 'rgba(200,147,58,0.2)' } as any}
                   value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 card-stagger">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="border-2 border-dashed border-slate-200 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 transition-all bg-white/50 h-full min-h-[160px] hover:border-[#C8933A] hover:text-[#C8933A]"
+              >
+                <Plus className="w-8 h-8 mb-2" />
+                <span className="font-bold text-sm">Add Opportunity</span>
+              </button>
               {filteredJobs.map(job => (
-                <div 
-                  key={job.id} 
-                  onClick={() => setSelectedJobId(job.id)} 
+                <div
+                  key={job.id}
+                  onClick={() => setSelectedJobId(job.id)}
                   className="bg-white p-5 rounded-2xl border border-slate-200 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group min-h-[160px] flex flex-col"
                 >
                   <div className="flex justify-between items-start mb-3 gap-2">
                     <div className="flex-1 min-w-0">
-                       <h3 className="font-black text-sm group-hover:text-indigo-600 transition-colors truncate">{job.title}</h3>
+                       <h3 className="font-black text-sm transition-colors truncate group-hover:text-[#C8933A]">{job.title}</h3>
                        <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest truncate">{job.company}</p>
                     </div>
                     {job.analysis && (
-                       <div className="bg-indigo-50 text-indigo-700 text-[8px] font-black px-1.5 py-0.5 rounded-md border border-indigo-100 flex items-center gap-1 shrink-0">
+                       <div className="text-[8px] font-black px-1.5 py-0.5 rounded-md border flex items-center gap-1 shrink-0 bg-amber-50 border-amber-100" style={{ color: 'var(--gold)' }}>
                          <Sparkles className="w-2.5 h-2.5" />
                          {job.analysis.score}%
                        </div>
                     )}
                   </div>
-                  
+
                   <div className="mt-auto space-y-3">
                     <div className="flex items-center justify-between gap-3 text-slate-400 border-t border-slate-50 pt-3">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <TrendingUp className="w-3 h-3 text-indigo-400 shrink-0" />
+                        <TrendingUp className="w-3 h-3 shrink-0" style={{ color: 'var(--gold)' }} />
                         <span className="font-bold text-slate-600 text-[10px] truncate">{job.salaryRange}</span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -235,15 +244,11 @@ const App: React.FC = () => {
                         job.status === JobStatus.INTERVIEWING ? 'bg-amber-50 text-amber-600' :
                         'bg-slate-50 text-slate-500'
                       }`}>{job.status}</span>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-all translate-x-1" />
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#C8933A] transition-all translate-x-1" />
                     </div>
                   </div>
                 </div>
               ))}
-              <button onClick={() => setIsAddModalOpen(true)} className="border-2 border-dashed border-slate-200 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-all bg-white/50 h-full min-h-[160px]">
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="font-bold text-sm">Add Opportunity</span>
-              </button>
             </div>
           </div>
         )}
@@ -251,7 +256,7 @@ const App: React.FC = () => {
         {activeTab === 'interviews' && <InterviewAgenda interviews={upcomingInterviews} onSelectJob={setSelectedJobId} />}
         {activeTab === 'resume' && <ResumeLab resumeData={resumeData} jobs={jobs} onSaveResume={setResumeData} onUpdateJob={updateJob} />}
         {activeTab === 'archive' && <ArchiveView jobs={jobs} onSelectJob={setSelectedJobId} onRestore={(id) => updateJob(id, { isArchived: false, status: JobStatus.APPLIED })} onDelete={handlePermanentDelete} />}
-        
+
         <div className="lg:hidden text-center mt-12 mb-6 text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] opacity-40 select-none">
           KNAW Labs
         </div>
@@ -271,10 +276,10 @@ const App: React.FC = () => {
       </nav>
 
       <AddJobModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddJob} />
-      <JobDetailModal 
-        job={selectedJob} onClose={() => setSelectedJobId(null)} 
-        onDelete={handleDeleteJob} 
-        onUpdateJob={(updates) => selectedJob && updateJob(selectedJob.id, updates)} 
+      <JobDetailModal
+        job={selectedJob} onClose={() => setSelectedJobId(null)}
+        onDelete={handleDeleteJob}
+        onUpdateJob={(updates) => selectedJob && updateJob(selectedJob.id, updates)}
         resume={resumeData.extractedText}
       />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} currentData={{ jobs }} onImport={data => setJobs(data.jobs)} onReset={() => setJobs([])} />
@@ -284,7 +289,11 @@ const App: React.FC = () => {
 };
 
 const NavButton = ({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
-  <button onClick={onClick} className={`flex flex-col items-center gap-1 flex-1 transition-all ${active ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}>
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center gap-1 flex-1 transition-all ${active ? 'scale-110' : 'text-slate-400 hover:text-slate-600'}`}
+    style={active ? { color: 'var(--gold)' } : {}}
+  >
     {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
     <span className="text-[10px] font-black uppercase tracking-tighter">{label}</span>
   </button>

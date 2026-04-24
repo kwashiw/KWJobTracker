@@ -26,10 +26,10 @@ const InterviewAgenda: React.FC<InterviewAgendaProps> = ({ interviews, onSelectJ
   const past = interviews.filter(i => new Date(i.date) < new Date()).reverse();
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="space-y-10 kw-slide-up">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Interview Schedule</h2>
+          <h2 className="font-display text-3xl font-bold text-slate-900">Interview Schedule</h2>
           <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">Your upcoming hiring milestones</p>
         </div>
         <div className="flex items-center bg-slate-100 rounded-xl p-1">
@@ -60,8 +60,6 @@ const InterviewAgenda: React.FC<InterviewAgendaProps> = ({ interviews, onSelectJ
     </div>
   );
 };
-
-// ─── List View (original) ────────────────────────────────────────────
 
 const ListView: React.FC<{ upcoming: AgendaItem[]; past: AgendaItem[]; onSelectJob: (id: string) => void }> = ({ upcoming, past, onSelectJob }) => (
   <>
@@ -94,8 +92,6 @@ const ListView: React.FC<{ upcoming: AgendaItem[]; past: AgendaItem[]; onSelectJ
   </>
 );
 
-// ─── Calendar View ───────────────────────────────────────────────────
-
 const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: string) => void }> = ({ interviews, onSelectJob }) => {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -116,7 +112,6 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
     setCurrentYear(today.getFullYear());
   };
 
-  // Group interviews by date string (YYYY-MM-DD)
   const interviewsByDate = useMemo(() => {
     const map: Record<string, AgendaItem[]> = {};
     interviews.forEach(item => {
@@ -127,16 +122,14 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
     return map;
   }, [interviews]);
 
-  // Build calendar grid
   const firstDay = new Date(currentYear, currentMonth, 1);
   const lastDay = new Date(currentYear, currentMonth + 1, 0);
-  const startDayOfWeek = firstDay.getDay(); // 0=Sun
+  const startDayOfWeek = firstDay.getDay();
   const daysInMonth = lastDay.getDate();
 
   const calendarDays: (number | null)[] = [];
   for (let i = 0; i < startDayOfWeek; i++) calendarDays.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarDays.push(d);
-  // Pad end to fill last row
   while (calendarDays.length % 7 !== 0) calendarDays.push(null);
 
   const monthLabel = firstDay.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -144,27 +137,30 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
 
   return (
     <div className="space-y-4">
-      {/* Month navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <ChevronLeft className="w-5 h-5 text-slate-500" />
           </button>
-          <h3 className="text-lg font-black text-slate-900 min-w-[200px] text-center">{monthLabel}</h3>
+          <h3 className="font-display text-xl font-bold text-slate-900 min-w-[200px] text-center">{monthLabel}</h3>
           <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <ChevronRight className="w-5 h-5 text-slate-500" />
           </button>
         </div>
         {!isCurrentMonth && (
-          <button onClick={goToToday} className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-all">
+          <button
+            onClick={goToToday}
+            className="text-[10px] font-black uppercase px-3 py-1.5 rounded-lg transition-all"
+            style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-mid)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold-dim)')}
+          >
             Today
           </button>
         )}
       </div>
 
-      {/* Calendar grid */}
       <div className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm">
-        {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-slate-100">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div key={day} className="py-3 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">
@@ -173,7 +169,6 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
           ))}
         </div>
 
-        {/* Day cells */}
         <div className="grid grid-cols-7">
           {calendarDays.map((day, idx) => {
             if (day === null) {
@@ -189,13 +184,17 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
               <div
                 key={dateKey}
                 className={`min-h-[100px] p-1.5 border-b border-r border-slate-100 transition-colors ${
-                  isToday ? 'bg-indigo-50/50' : isPast ? 'bg-slate-50/30' : 'bg-white'
+                  isPast ? 'bg-slate-50/30' : 'bg-white'
                 }`}
+                style={isToday ? { background: 'var(--gold-dim)' } : {}}
               >
-                <div className={`text-right mb-1 ${isToday ? '' : ''}`}>
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black ${
-                    isToday ? 'bg-indigo-600 text-white' : isPast ? 'text-slate-300' : 'text-slate-600'
-                  }`}>
+                <div className="text-right mb-1">
+                  <span
+                    className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black ${
+                      isPast && !isToday ? 'text-slate-300' : isToday ? 'text-white' : 'text-slate-600'
+                    }`}
+                    style={isToday ? { background: 'var(--gold)' } : {}}
+                  >
                     {day}
                   </span>
                 </div>
@@ -205,10 +204,9 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
                       key={item.id}
                       onClick={() => onSelectJob(item.jobId)}
                       className={`w-full text-left px-1.5 py-1 rounded-lg text-[8px] sm:text-[9px] font-bold truncate transition-all hover:opacity-80 ${
-                        isPast
-                          ? 'bg-slate-100 text-slate-400'
-                          : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                        isPast ? 'bg-slate-100 text-slate-400' : ''
                       }`}
+                      style={!isPast ? { background: 'var(--gold-mid)', color: 'var(--gold-hover)' } : {}}
                       title={`${item.jobTitle} at ${item.company} — ${item.stage}`}
                     >
                       <span className="font-black">{new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -222,22 +220,19 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
         </div>
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-4 px-2">
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200" />
+          <div className="w-3 h-3 rounded border" style={{ background: 'var(--gold-dim)', borderColor: 'var(--gold-border)' }} />
           <span className="text-[9px] font-bold text-slate-400 uppercase">Interview</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-indigo-600" />
+          <div className="w-3 h-3 rounded-full" style={{ background: 'var(--gold)' }} />
           <span className="text-[9px] font-bold text-slate-400 uppercase">Today</span>
         </div>
       </div>
     </div>
   );
 };
-
-// ─── Agenda Card (shared) ────────────────────────────────────────────
 
 const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }> = ({ item, onSelect }) => {
   const dateObj = new Date(item.date);
@@ -246,12 +241,16 @@ const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }>
   return (
     <div
       onClick={() => onSelect(item.jobId)}
-      className={`bg-white border p-5 sm:p-6 rounded-[2rem] hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 ${isToday ? 'border-indigo-400 shadow-xl shadow-indigo-100' : 'border-slate-200'}`}
+      className={`bg-white border p-5 sm:p-6 rounded-[2rem] hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 ${isToday ? 'shadow-xl' : 'border-slate-200'}`}
+      style={isToday ? { borderColor: 'var(--gold)', boxShadow: '0 8px 32px rgba(200,147,58,0.15)' } : {}}
     >
-      {isToday && <div className="absolute top-0 left-0 right-0 h-1.5 bg-indigo-500" />}
+      {isToday && <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: 'var(--gold)' }} />}
 
       <div className="flex sm:flex-col items-center gap-2 sm:w-20 shrink-0">
-        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+        <div
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'text-white' : 'bg-slate-100 text-slate-600'}`}
+          style={isToday ? { background: 'var(--gold)' } : {}}
+        >
           <span className="text-[9px] sm:text-xs font-black uppercase">{dateObj.toLocaleDateString(undefined, { month: 'short' })}</span>
           <span className="text-lg sm:text-xl font-black leading-none">{dateObj.getDate()}</span>
         </div>
@@ -260,11 +259,14 @@ const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }>
 
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
-          <span className={`px-2 py-0.5 rounded-[4px] text-[9px] font-black uppercase tracking-widest ${isToday ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+          <span
+            className={`px-2 py-0.5 rounded-[4px] text-[9px] font-black uppercase tracking-widest ${isToday ? '' : 'bg-slate-100 text-slate-500'}`}
+            style={isToday ? { background: 'var(--gold-dim)', color: 'var(--gold-hover)' } : {}}
+          >
             {item.stage}
           </span>
           <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <Briefcase className="w-3 h-3 text-indigo-300" /> {item.company}
+            <Briefcase className="w-3 h-3" style={{ color: 'var(--gold)' }} /> {item.company}
           </div>
           {item.remindersSet && (
             <div className="flex items-center gap-1 text-[8px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md font-black uppercase animate-pulse border border-amber-100">
@@ -272,20 +274,21 @@ const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }>
             </div>
           )}
         </div>
-        <h4 className="text-lg sm:text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors truncate mb-3">{item.jobTitle}</h4>
+        <h4 className="text-lg sm:text-xl font-black text-slate-900 transition-colors truncate mb-3 group-hover:text-[#C8933A]">{item.jobTitle}</h4>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {item.interviewer && (
             <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600">
-              <User className="w-3.5 h-3.5 text-indigo-400" /> {item.interviewer}
+              <User className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} /> {item.interviewer}
             </div>
           )}
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600">
-            <MapPin className="w-3.5 h-3.5 text-indigo-400" /> {item.mode}
+            <MapPin className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} /> {item.mode}
           </div>
           {item.link && (
             <a
               href={item.link} target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-indigo-600 hover:underline"
+              className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black hover:underline"
+              style={{ color: 'var(--gold)' }}
               onClick={e => e.stopPropagation()}
             >
               <ExternalLink className="w-3.5 h-3.5" /> Join Call
@@ -294,8 +297,8 @@ const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }>
         </div>
       </div>
 
-      <div className="sm:w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 transition-colors hidden sm:flex">
-        <Clock className="w-5 h-5 text-slate-300 group-hover:text-indigo-400" />
+      <div className="sm:w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 transition-colors hidden sm:flex group-hover:bg-amber-50">
+        <Clock className="w-5 h-5 text-slate-300 group-hover:text-[#C8933A]" />
       </div>
     </div>
   );

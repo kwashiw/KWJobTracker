@@ -5,20 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#C8933A">
     <title>KWJobTracker</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3850/3850285.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" crossorigin="anonymous"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --gold: #C8933A;
+            --gold-hover: #B07830;
+            --gold-dim: rgba(200,147,58,0.08);
+            --gold-mid: rgba(200,147,58,0.15);
+            --gold-border: rgba(200,147,58,0.28);
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
             -webkit-tap-highlight-color: transparent;
             color: #1e293b;
+        }
+        .font-display {
+            font-family: 'Cormorant Garamond', serif;
+            letter-spacing: -0.01em;
         }
         input, textarea, select {
             color: #0f172a !important;
@@ -29,8 +40,29 @@
         ::-webkit-scrollbar {
             display: none;
         }
+        @keyframes kw-slide-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes kw-zoom-in {
+            from { opacity: 0; transform: scale(0.96); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .kw-slide-up { animation: kw-slide-up 0.28s ease both; }
+        .kw-zoom-in  { animation: kw-zoom-in  0.22s ease both; }
+        .card-stagger > * { animation: kw-slide-up 0.3s ease both; }
+        .card-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+        .card-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+        .card-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+        .card-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+        .card-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+        .card-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+        .card-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+        .card-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+        .card-stagger > *:nth-child(9)  { animation-delay: 320ms; }
+        .card-stagger > *:nth-child(10) { animation-delay: 360ms; }
     </style>
-    
+
 </head>
 <body>
     <div id="root"></div>

@@ -211,7 +211,7 @@ const App: React.FC = () => {
                 <div
                   key={job.id}
                   onClick={() => setSelectedJobId(job.id)}
-                  className="bg-white p-5 rounded-2xl border border-slate-200 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group min-h-[160px] flex flex-col"
+                  className="bg-white p-5 rounded-2xl border border-slate-200 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group min-h-[160px] flex flex-col min-w-0"
                 >
                   <div className="flex justify-between items-start mb-3 gap-2">
                     <div className="flex-1 min-w-0">

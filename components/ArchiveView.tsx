@@ -30,7 +30,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({ jobs, onSelectJob, onRestore,
           {archivedJobs.map(job => (
             <div
               key={job.id}
-              className="bg-white border border-slate-200 p-5 sm:p-6 rounded-[2rem] hover:shadow-xl transition-all group flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 opacity-80 hover:opacity-100"
+              className="bg-white border border-slate-200 p-5 sm:p-6 rounded-[2rem] hover:shadow-xl transition-all group flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 opacity-80 hover:opacity-100 min-w-0 overflow-hidden"
             >
               <div className="flex-1 min-w-0" onClick={() => onSelectJob(job.id)}>
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">

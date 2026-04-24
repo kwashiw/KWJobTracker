@@ -171,7 +171,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
     }
   };
 
-  const analyzedJobs = jobs.filter(j => j.analysis).sort((a, b) => (b.analysis?.score || 0) - (a.analysis?.score || 0));
+  const analyzedJobs = jobs.filter(j => j.analysis && j.status !== 'Rejected' && !j.isArchived).sort((a, b) => (b.analysis?.score || 0) - (a.analysis?.score || 0));
 
   return (
     <div className="space-y-10 kw-slide-up pb-20">

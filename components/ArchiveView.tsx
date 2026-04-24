@@ -41,7 +41,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({ jobs, onSelectJob, onRestore,
                     <Briefcase className="w-3 h-3" style={{ color: 'var(--gold)' }} /> {job.company}
                   </div>
                 </div>
-                <h4 className="text-lg sm:text-xl font-black text-slate-900 truncate cursor-pointer transition-colors group-hover:text-[#C8933A]">
+                <h4 className="text-sm sm:text-base font-black text-slate-900 truncate cursor-pointer transition-colors group-hover:text-[#C8933A]">
                   {job.title}
                 </h4>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mt-1">

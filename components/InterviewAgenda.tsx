@@ -142,7 +142,7 @@ const CalendarView: React.FC<{ interviews: AgendaItem[]; onSelectJob: (id: strin
           <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <ChevronLeft className="w-5 h-5 text-slate-500" />
           </button>
-          <h3 className="font-display text-xl font-bold text-slate-900 min-w-[200px] text-center">{monthLabel}</h3>
+          <h3 className="font-display text-base sm:text-xl font-bold text-slate-900 text-center w-28 sm:w-48">{monthLabel}</h3>
           <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <ChevronRight className="w-5 h-5 text-slate-500" />
           </button>
@@ -274,7 +274,7 @@ const AgendaCard: React.FC<{ item: AgendaItem, onSelect: (id: string) => void }>
             </div>
           )}
         </div>
-        <h4 className="text-lg sm:text-xl font-black text-slate-900 transition-colors truncate mb-3 group-hover:text-[#C8933A]">{item.jobTitle}</h4>
+        <h4 className="text-sm sm:text-base font-black text-slate-900 transition-colors truncate mb-3 group-hover:text-[#C8933A]">{item.jobTitle}</h4>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {item.interviewer && (
             <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600">

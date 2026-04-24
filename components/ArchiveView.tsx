@@ -78,7 +78,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({ jobs, onSelectJob, onRestore,
             Archived records are kept to ensure your Career Engine stats remain accurate. Every application represents growth and experience, regardless of the outcome.
           </p>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full -translate-y-1/4" />
       </div>
     </div>
   );

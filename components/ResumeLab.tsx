@@ -334,7 +334,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
               <h3 className="font-display text-2xl font-bold">AI Strategy</h3>
               <p className="text-xs font-bold leading-relaxed opacity-90">Our vector analysis engine compares your document rendering against the latent requirements of recruiters.</p>
             </div>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full -translate-y-1/4" />
           </div>
         </div>
       </div>

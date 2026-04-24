@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FileText, Sparkles, CheckCircle2, TrendingUp, AlertCircle, Upload, Loader2, FileUp, Edit3, Eye, ExternalLink, Download, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { FileText, Sparkles, CheckCircle2, AlertCircle, Loader2, FileUp, Edit3, Eye, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { JobApplication, ResumeData } from '../types';
 
 interface ResumeLabProps {
@@ -17,13 +17,12 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   const [numPages, setNumPages] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
   const [isEngineReady, setIsEngineReady] = useState(false);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfDocRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Poll for PDF.js engine
   useEffect(() => {
     const checkEngine = () => {
       // @ts-ignore
@@ -37,16 +36,12 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       }
       return false;
     };
-
     if (!checkEngine()) {
-      const interval = setInterval(() => {
-        if (checkEngine()) clearInterval(interval);
-      }, 500);
+      const interval = setInterval(() => { if (checkEngine()) clearInterval(interval); }, 500);
       return () => clearInterval(interval);
     }
   }, []);
 
-  // Sync tempText with resumeData prop changes
   useEffect(() => {
     if (!resumeData.content || !editing) {
       setTempText(resumeData.type === 'pdf' ? resumeData.extractedText || '' : resumeData.content || '');
@@ -60,25 +55,20 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
 
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current || !canvasRef.current || !containerRef.current) return;
-    
     setIsRendering(true);
     try {
       const page = await pdfDocRef.current.getPage(pageNum);
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       if (!context) return;
-      
       const unscaledViewport = page.getViewport({ scale: 1 });
       const containerWidth = containerRef.current.clientWidth;
       const scale = containerWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: scale * 2 });
-
       canvas.height = viewport.height;
       canvas.width = viewport.width;
-
       canvas.style.width = `${containerWidth}px`;
       canvas.style.height = `${(containerWidth / unscaledViewport.width) * unscaledViewport.height}px`;
-
       await page.render({ canvasContext: context, viewport: viewport }).promise;
     } catch (err) {
       console.error("Page render error:", err);
@@ -90,7 +80,6 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   useEffect(() => {
     let active = true;
     const pdfjs = getPdfjs();
-
     if (resumeData.type === 'pdf' && resumeData.content && !editing && pdfjs) {
       const loadPdf = async () => {
         try {
@@ -106,10 +95,7 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       };
       loadPdf();
     } else {
-      if (pdfDocRef.current) { 
-        pdfDocRef.current.destroy?.(); 
-        pdfDocRef.current = null; 
-      }
+      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
       setNumPages(0);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
@@ -147,26 +133,16 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
       setEditing(true);
       setCurrentPage(1);
       setNumPages(0);
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy?.();
-        pdfDocRef.current = null;
-      }
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (pdfDocRef.current) { pdfDocRef.current.destroy?.(); pdfDocRef.current = null; }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const pdfjs = getPdfjs();
-    
     if (!file) return;
-    if (!pdfjs || !isEngineReady) {
-      alert("Career engine is still warming up. Please try again in 2 seconds.");
-      return;
-    }
-
+    if (!pdfjs || !isEngineReady) { alert("Career engine is still warming up. Please try again in 2 seconds."); return; }
     if (file.type !== 'application/pdf') { alert("Please upload a PDF file."); return; }
     if (file.size > 4 * 1024 * 1024) { alert("File too large. Please keep PDF resumes under 4MB for optimal performance."); return; }
 
@@ -180,7 +156,6 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
         const content = await page.getTextContent();
         fullText += content.items.map((item: any) => item.str || "").join(" ") + "\n";
       }
-
       const reader = new FileReader();
       reader.onload = (event) => {
         onSaveResume({ type: 'pdf', content: event.target?.result as string, extractedText: fullText });
@@ -199,18 +174,21 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
   const analyzedJobs = jobs.filter(j => j.analysis).sort((a, b) => (b.analysis?.score || 0) - (a.analysis?.score || 0));
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20">
+    <div className="space-y-10 kw-slide-up pb-20">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Career Engine</h2>
+          <h2 className="font-display text-3xl font-bold text-slate-900">Career Engine</h2>
           <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">AI match scoring & tech prep</p>
         </div>
         <div className="flex items-center gap-2">
           <input type="file" accept=".pdf" ref={fileInputRef} className="hidden" onChange={handlePdfUpload} />
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-xs flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-indigo-100"
+            className="text-white px-6 py-2.5 rounded-2xl font-black text-xs flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: 'var(--gold)', boxShadow: '0 4px 16px rgba(200,147,58,0.25)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold)')}
           >
             {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
             {resumeData.content ? 'Update PDF' : 'Upload Resume PDF'}
@@ -223,25 +201,17 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[700px]">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                {resumeData.type === 'pdf' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />} 
+                {resumeData.type === 'pdf' ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
                 {resumeData.type === 'pdf' ? 'Visual Document' : 'Resume Profile'}
               </h3>
               <div className="flex items-center gap-2">
                 {resumeData.type === 'pdf' && numPages > 1 && (
                   <div className="flex items-center gap-2 mr-4 bg-white border border-slate-200 rounded-lg p-1">
-                    <button 
-                      disabled={currentPage <= 1 || isRendering}
-                      onClick={() => { setCurrentPage(p => p - 1); }}
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"
-                    >
+                    <button disabled={currentPage <= 1 || isRendering} onClick={() => setCurrentPage(p => p - 1)} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <span className="text-[10px] font-black text-slate-500 w-12 text-center uppercase">{currentPage} / {numPages}</span>
-                    <button 
-                      disabled={currentPage >= numPages || isRendering}
-                      onClick={() => { setCurrentPage(p => p + 1); }}
-                      className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"
-                    >
+                    <button disabled={currentPage >= numPages || isRendering} onClick={() => setCurrentPage(p => p + 1)} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -255,14 +225,18 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                       <button onClick={handleSaveText} className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-all">Save Profile</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditing(true); }} className="text-indigo-600 font-bold text-[10px] uppercase hover:bg-indigo-50 px-3 py-1.5 rounded-lg">Manual Edit</button>
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-all"
+                      style={{ color: 'var(--gold)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-dim)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Manual Edit
+                    </button>
                   )}
                   {resumeData.content && (
-                    <button 
-                      onClick={handleClearResume} 
-                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                      title="Remove Resume"
-                    >
+                    <button onClick={handleClearResume} className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Remove Resume">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -283,18 +257,23 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
               )}
               {editing ? (
                 <div className="w-full h-full p-6">
-                  <textarea 
+                  <textarea
                     value={tempText}
                     onChange={e => setTempText(e.target.value)}
                     placeholder="Paste resume profile text here..."
-                    className="w-full h-full min-h-[600px] p-8 bg-white border border-slate-300 rounded-3xl focus:ring-2 focus:ring-indigo-500/20 text-xs font-medium text-slate-700 resize-none outline-none shadow-sm"
+                    className="w-full h-full min-h-[600px] p-8 bg-white border border-slate-300 rounded-3xl focus:ring-2 focus:outline-none text-xs font-medium text-slate-700 resize-none shadow-sm"
+                    style={{ '--tw-ring-color': 'rgba(200,147,58,0.25)' } as any}
                   />
                 </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center bg-white">
                   {resumeData.type === 'pdf' && resumeData.content ? (
                     <div className="relative w-full bg-white shadow-lg">
-                      {isRendering && <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>}
+                      {isRendering && (
+                        <div className="absolute inset-0 z-10 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
+                          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--gold)' }} />
+                        </div>
+                      )}
                       <canvas ref={canvasRef} className="w-full h-auto block" />
                     </div>
                   ) : resumeData.content ? (
@@ -313,10 +292,10 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 bg-slate-900 text-white/50 text-[8px] font-black uppercase tracking-[0.2em] text-center flex items-center justify-center gap-2">
-               <CheckCircle2 className={`w-3 h-3 ${resumeData.extractedText.length > 50 ? 'text-emerald-400' : 'text-slate-600'}`} />
-               AI Analysis Context Strength: {resumeData.extractedText.length} Characters
+              <CheckCircle2 className={`w-3 h-3 ${resumeData.extractedText.length > 50 ? 'text-emerald-400' : 'text-slate-600'}`} />
+              AI Analysis Context Strength: {resumeData.extractedText.length} Characters
             </div>
           </div>
         </div>
@@ -331,9 +310,9 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             ) : (
               <div className="space-y-3">
                 {analyzedJobs.map(job => (
-                  <div key={job.id} className="bg-white border border-slate-200 p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 group hover:border-indigo-200 transition-all cursor-default">
+                  <div key={job.id} className="bg-white border border-slate-200 p-5 rounded-[1.5rem] shadow-sm flex items-center gap-4 group transition-all cursor-default hover:border-[rgba(200,147,58,0.3)]">
                     <div className="w-12 h-12 rounded-xl bg-slate-900 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-[10px] font-black text-indigo-400 uppercase leading-none mb-0.5">{job.analysis?.score}%</span>
+                      <span className="text-[10px] font-black uppercase leading-none mb-0.5" style={{ color: 'var(--gold)' }}>{job.analysis?.score}%</span>
                       <span className="text-[6px] font-black text-white uppercase tracking-widest">Match</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -347,13 +326,15 @@ const ResumeLab: React.FC<ResumeLabProps> = ({ resumeData, jobs, onSaveResume, o
             )}
           </section>
 
-          <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100">
-             <div className="relative z-10 space-y-4">
-               <div className="bg-white text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"><Sparkles className="w-6 h-6" /></div>
-               <h3 className="text-xl font-black">AI Strategy</h3>
-               <p className="text-xs font-bold leading-relaxed opacity-80">Our vector analysis engine compares your document rendering against the latent requirements of recruiters.</p>
-             </div>
-             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+          <div className="rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl" style={{ background: 'var(--gold)', boxShadow: '0 8px 32px rgba(200,147,58,0.3)' }}>
+            <div className="relative z-10 space-y-4">
+              <div className="bg-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg" style={{ color: 'var(--gold)' }}>
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <h3 className="font-display text-2xl font-bold">AI Strategy</h3>
+              <p className="text-xs font-bold leading-relaxed opacity-90">Our vector analysis engine compares your document rendering against the latent requirements of recruiters.</p>
+            </div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
           </div>
         </div>
       </div>

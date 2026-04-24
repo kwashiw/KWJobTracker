@@ -20,7 +20,6 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
 
   const prevUrlRef = useRef(url);
 
-  // Clear import status when URL changes
   useEffect(() => {
     if (prevUrlRef.current !== url) {
       setImportStatus(null);
@@ -41,15 +40,9 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
       const result = await magicImport(url);
       const { data, warning } = result;
 
-      // Populate fields with whatever we got
-      if (data.description && data.description.length > 10) {
-        setDescription(data.description);
-      }
-      if (data.title && data.title !== "Not found" && !title) {
-        setTitle(data.title);
-      }
+      if (data.description && data.description.length > 10) setDescription(data.description);
+      if (data.title && data.title !== "Not found" && !title) setTitle(data.title);
 
-      // Determine feedback
       const populated: string[] = [];
       if (data.title && data.title !== "Not found") populated.push("title");
       if (data.description && data.description.length > 10) populated.push("description");
@@ -58,9 +51,7 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
       if (populated.length > 0) {
         setImportStatus({
           type: warning ? 'warning' : 'success',
-          message: warning
-            ? warning
-            : `Found ${populated.join(", ")} for ${data.company || "this job"}.`
+          message: warning ? warning : `Found ${populated.join(", ")} for ${data.company || "this job"}.`
         });
       } else {
         setImportStatus({
@@ -69,10 +60,7 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
         });
       }
     } catch (err) {
-      setImportStatus({
-        type: 'error',
-        message: "An unexpected error occurred. Please paste the job description manually."
-      });
+      setImportStatus({ type: 'error', message: "An unexpected error occurred. Please paste the job description manually." });
     } finally {
       setIsFetching(false);
     }
@@ -82,17 +70,14 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
     e.preventDefault();
     if (!title || !description) return;
     onAdd(title, description, url);
-    setTitle("");
-    setUrl("");
-    setDescription("");
-    setImportStatus(null);
+    setTitle(""); setUrl(""); setDescription(""); setImportStatus(null);
   };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-xl font-black text-slate-900">New Application</h2>
+          <h2 className="font-display text-2xl font-bold text-slate-900">New Application</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-slate-500" />
           </button>
@@ -107,7 +92,8 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
               required
               type="text"
               placeholder="e.g. Senior Frontend Engineer"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:outline-none transition-all"
+              style={{ '--tw-ring-color': 'rgba(200,147,58,0.35)' } as any}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -122,7 +108,10 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
                 type="button"
                 onClick={handleMagicImport}
                 disabled={isFetching || !url}
-                className="text-[9px] font-black uppercase text-indigo-600 flex items-center gap-1.5 bg-indigo-50 px-2 py-1 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-all"
+                className="text-[9px] font-black uppercase flex items-center gap-1.5 px-2 py-1 rounded-md disabled:opacity-50 transition-all"
+                style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-mid)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold-dim)')}
               >
                 {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                 Magic Import
@@ -131,7 +120,8 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
             <input
               type="url"
               placeholder="Paste job posting link..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:outline-none transition-all"
+              style={{ '--tw-ring-color': 'rgba(200,147,58,0.35)' } as any}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
@@ -143,11 +133,7 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
               }`}>
                 {importStatus.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
                 <span className="leading-relaxed flex-1">{importStatus.message}</span>
-                <button
-                  type="button"
-                  onClick={() => setImportStatus(null)}
-                  className="shrink-0 mt-0.5 opacity-50 hover:opacity-100 transition-opacity"
-                >
+                <button type="button" onClick={() => setImportStatus(null)} className="shrink-0 mt-0.5 opacity-50 hover:opacity-100 transition-opacity">
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -162,7 +148,8 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
               required
               rows={6}
               placeholder="Paste details here. AI will extract company & salary automatically..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all resize-none text-xs"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:outline-none transition-all resize-none text-xs"
+              style={{ '--tw-ring-color': 'rgba(200,147,58,0.35)' } as any}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -171,7 +158,10 @@ const AddJobModal: React.FC<AddJobModalProps> = ({ isOpen, onClose, onAdd }) => 
           <div className="pt-4">
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 active:scale-[0.98]"
+              className="w-full text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98]"
+              style={{ background: 'var(--gold)', boxShadow: '0 4px 16px rgba(200,147,58,0.25)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--gold-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold)')}
             >
               Add to Tracker
             </button>

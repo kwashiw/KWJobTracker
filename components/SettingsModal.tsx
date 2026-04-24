@@ -33,7 +33,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
     const dataStr = JSON.stringify(currentData, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
     const exportFileDefaultName = `kw_backup_${new Date().toISOString().split('T')[0]}.json`;
-    
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -55,11 +54,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
   const handleImportSyncCode = () => {
     const cleanInput = syncInput.trim();
     if (!cleanInput) return;
-    
     try {
       const decodedStr = decodeBase64(cleanInput);
       const decoded = JSON.parse(decodedStr);
-      
       if (decoded.jobs && Array.isArray(decoded.jobs)) {
         if (window.confirm("Overwrite current device data with this Sync Code?")) {
           onImport(decoded);
@@ -76,7 +73,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -99,34 +95,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
   const handleResetClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
     const confirmed = window.confirm("This will reset all the stats to 0 and remove all jobs from the app");
-    if (confirmed) {
-      onReset();
-    }
+    if (confirmed) onReset();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] kw-zoom-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">Sync & Privacy</h2>
+          <h2 className="font-display text-2xl font-bold text-slate-900">Sync & Privacy</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
         <div className="p-6 space-y-6 overflow-y-auto">
-          <div className="bg-indigo-50 p-4 rounded-2xl flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-            <p className="text-xs font-medium text-indigo-900 leading-relaxed">
+          <div className="p-4 rounded-2xl flex items-start gap-3" style={{ background: 'var(--gold-dim)' }}>
+            <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--gold)' }} />
+            <p className="text-xs font-medium leading-relaxed text-slate-700">
               KWJobTracker stores data locally. Use the Sync Code to move your tracker between your phone, laptop, or tablet.
             </p>
           </div>
 
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Device Transfer</h3>
-            <button 
+            <button
               onClick={handleCopySyncString}
               className="w-full flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
             >
@@ -143,16 +136,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
               <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
                 <Terminal className="w-3 h-3" /> Import Sync Code
               </label>
-              <textarea 
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-mono text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none h-20"
+              <textarea
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-mono text-slate-900 focus:ring-2 focus:outline-none h-20"
+                style={{ '--tw-ring-color': 'rgba(200,147,58,0.35)' } as any}
                 placeholder="Paste code from your other device..."
                 value={syncInput}
                 onChange={(e) => setSyncInput(e.target.value)}
               />
-              <button 
+              <button
                 onClick={handleImportSyncCode}
                 disabled={!syncInput.trim()}
-                className="w-full py-2 bg-indigo-50 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-2 font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}
+                onMouseEnter={e => !syncInput.trim() || (e.currentTarget.style.background = 'var(--gold-mid)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--gold-dim)')}
               >
                 Import from Code
               </button>
@@ -176,12 +173,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
             <h3 className="text-xs font-bold text-rose-500 uppercase tracking-widest flex items-center gap-1.5">
               <AlertTriangle className="w-3 h-3" /> Danger Zone
             </h3>
-            <button 
+            <button
               type="button"
               onClick={handleResetClick}
               className="w-full flex items-center justify-center gap-2 p-4 border-2 border-rose-100 text-rose-600 rounded-2xl hover:bg-rose-50 transition-all font-bold active:scale-95 group cursor-pointer"
             >
-              <Trash2 className="w-5 h-5 group-hover:shake" /> Reset All Tracker Data
+              <Trash2 className="w-5 h-5" /> Reset All Tracker Data
             </button>
           </div>
         </div>

@@ -6,7 +6,7 @@ import {
   Bell, BellOff, Send, Globe, AlertTriangle, Edit2, Save, RotateCcw, RefreshCw, Archive, StickyNote
 } from 'lucide-react';
 import { JobApplication, JobStatus, Interview, TodoItem } from '../types';
-import { analyzeJobMatch } from '../services/gemini';
+import { analyzeJobMatch, extractJobDetails } from '../services/gemini';
 
 interface JobDetailModalProps {
   job: JobApplication | null;
@@ -24,6 +24,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
   const [editingTodo, setEditingTodo] = useState<{ interviewId: string; todoId: string; type: 'pre' | 'post'; text: string } | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isRescanning, setIsRescanning] = useState(false);
   const [editFields, setEditFields] = useState({ title: '', company: '', salaryRange: '', description: '', link: '' });
 
   useEffect(() => {
@@ -37,8 +38,16 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
   const handleStatusChange = (status: JobStatus) => onUpdateJob({ status });
 
   const handleSaveChanges = () => {
+    const descriptionChanged = editFields.description.trim() !== job.description.trim();
     onUpdateJob({ title: editFields.title, company: editFields.company, salaryRange: editFields.salaryRange, description: editFields.description, link: editFields.link.trim() || undefined });
     setIsEditing(false);
+    if (descriptionChanged && editFields.description.trim()) {
+      setIsRescanning(true);
+      extractJobDetails(editFields.description)
+        .then(result => { onUpdateJob({ salaryRange: result.salaryRange }); })
+        .catch(() => {})
+        .finally(() => setIsRescanning(false));
+    }
   };
 
   const handleRestore = () => {
@@ -296,7 +305,8 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                     </div>
                   ) : (
                     <div className="text-[9px] sm:text-[10px] font-black px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1" style={{ color: 'var(--gold)', background: 'var(--gold-dim)' }}>
-                      <TrendingUp className="w-3 h-3" /> {job.salaryRange}
+                      {isRescanning ? <Loader2 className="w-3 h-3 animate-spin" /> : <TrendingUp className="w-3 h-3" />}
+                      {isRescanning ? 'Rescanning...' : job.salaryRange}
                     </div>
                   )}
                 </div>

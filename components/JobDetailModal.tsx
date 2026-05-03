@@ -225,11 +225,11 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto lg:overflow-hidden bg-slate-50/50">
-          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:h-full">
+        <div className="overflow-y-auto flex-1 bg-slate-50/50">
+          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
 
             {/* Main Content */}
-            <div className="lg:col-span-8 space-y-6 lg:overflow-y-auto lg:pb-6">
+            <div className="lg:col-span-8 space-y-6">
 
               {/* AI Match Bar */}
               {!isEditing && !job.isArchived && (
@@ -344,8 +344,8 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
             </div>
 
             {/* Sidebar */}
-            <div className="lg:col-span-4 space-y-6 lg:overflow-y-auto lg:pb-6">
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm lg:sticky lg:top-6">
                 <div className="space-y-6">
 
                   {/* Status */}

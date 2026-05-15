@@ -142,7 +142,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] lg:h-[95vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex items-start justify-between bg-white z-20">
@@ -233,8 +233,8 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
           </div>
         </div>
 
-        <div className="overflow-y-auto lg:overflow-hidden flex-1 bg-slate-50/50">
-          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:h-full">
+        <div className="overflow-y-auto flex-1 bg-slate-50/50">
+          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
 
             {/* Main Content */}
             <div className="lg:col-span-8 space-y-6">

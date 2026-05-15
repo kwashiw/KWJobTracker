@@ -22,6 +22,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
   const [newTaskText, setNewTaskText] = useState<{ [key: string]: string }>({});
   const [activeTaskInput, setActiveTaskInput] = useState<{ id: string, type: 'pre' | 'post' | null }>({ id: '', type: null });
   const [editingTodo, setEditingTodo] = useState<{ interviewId: string; todoId: string; type: 'pre' | 'post'; text: string } | null>(null);
+  const [editingStage, setEditingStage] = useState<{ interviewId: string; text: string } | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
@@ -92,6 +93,13 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
     updateInterview(interviewId, type === 'pre' ? { preTodos: newList } : { postTodos: newList });
   };
 
+  const saveStageEdit = () => {
+    if (!editingStage) return;
+    const { interviewId, text } = editingStage;
+    updateInterview(interviewId, { stage: text.trim() || 'New Step' });
+    setEditingStage(null);
+  };
+
   const saveTodoEdit = () => {
     if (!editingTodo) return;
     const { interviewId, todoId, type, text } = editingTodo;
@@ -134,7 +142,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] lg:h-[95vh] kw-zoom-in" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 flex items-start justify-between bg-white z-20">
@@ -225,8 +233,8 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 bg-slate-50/50">
-          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        <div className="overflow-y-auto lg:overflow-hidden flex-1 bg-slate-50/50">
+          <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:h-full">
 
             {/* Main Content */}
             <div className="lg:col-span-8 space-y-6">
@@ -387,17 +395,31 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, onDelete,
                             </button>
                           )}
 
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center font-black text-[9px] shadow-sm border border-slate-100" style={{ color: 'var(--gold)' }}>
+                          <div className="flex items-start gap-2">
+                            <div className="w-5 h-5 shrink-0 mt-0.5 bg-white rounded-full flex items-center justify-center font-black text-[9px] shadow-sm border border-slate-100" style={{ color: 'var(--gold)' }}>
                               {idx + 1}
                             </div>
-                            <input
-                              disabled={job.isArchived}
-                              value={interview.stage}
-                              onChange={e => updateInterview(interview.id, { stage: e.target.value })}
-                              className="bg-transparent border-none font-black text-slate-800 focus:ring-0 text-xs p-0 flex-1 outline-none disabled:opacity-70"
-                              placeholder="Step name..."
-                            />
+                            {editingStage?.interviewId === interview.id ? (
+                              <input
+                                autoFocus
+                                value={editingStage.text}
+                                onChange={e => setEditingStage({ ...editingStage, text: e.target.value })}
+                                onBlur={saveStageEdit}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') saveStageEdit();
+                                  if (e.key === 'Escape') setEditingStage(null);
+                                }}
+                                className="text-xs leading-snug flex-1 font-black text-slate-800 bg-amber-50 border border-[rgba(200,147,58,0.4)] rounded px-1.5 py-0.5 outline-none focus:border-[#C8933A]"
+                              />
+                            ) : (
+                              <span
+                                onDoubleClick={() => !job.isArchived && setEditingStage({ interviewId: interview.id, text: interview.stage })}
+                                title={job.isArchived ? '' : 'Double-click to edit'}
+                                className={`text-xs leading-snug font-black text-slate-800 break-words min-w-0 flex-1 ${!job.isArchived ? 'cursor-text' : ''}`}
+                              >
+                                {interview.stage || 'New Step'}
+                              </span>
+                            )}
                           </div>
 
                           <div className="space-y-2.5">
